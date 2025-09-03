@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Inversiones</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827;
+            color: #d1d5db;
+        }
+        .card {
+            background-color: #1f2937;
+            border: 1px solid #374151;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+        }
+        .tab-button {
+            transition: all 0.3s ease;
+            border-bottom: 2px solid transparent;
+        }
+        .tab-button.active {
+            color: #3b82f6;
+            border-bottom-color: #3b82f6;
+        }
+        .positive { color: #22c55e; }
+        .negative { color: #ef4444; }
+        input, select, button {
+            background-color: #374151;
+            border: 1px solid #4b5563;
+            color: #d1d5db;
+            border-radius: 0.5rem;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px #1e40af;
+        }
+        .btn-primary {
+            background-color: #3b82f6;
+            color: white;
+            font-weight: 500;
+            transition: background-color 0.3s;
+        }
+        .btn-primary:hover {
+            background-color: #2563eb;
+        }
+         .btn-secondary {
+            background-color: #4b5563;
+            color: white;
+            font-weight: 500;
+            transition: background-color 0.3s;
+        }
+        .btn-secondary:hover {
+            background-color: #6b7280;
+        }
+        .btn-danger {
+            background-color: #ef4444;
+            color: white;
+            font-weight: 500;
+            transition: background-color 0.3s;
+        }
+        .btn-danger:hover {
+            background-color: #dc2626;
+        }
+        .loader {
+            border: 4px solid #4b5563;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+        .modal-content {
+            max-width: 600px;
+            width: 95%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="max-w-7xl mx-auto">
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold text-white mb-2">Dashboard Financiero</h1>
+            <p class="text-gray-400">Tu centro de control financiero para tomar decisiones inteligentes.</p>
+             <div class="mt-4 p-4 rounded-lg bg-blue-900/50 border border-blue-700 text-blue-200">
+                <label for="apiKey" class="block text-sm font-medium mb-1">API Key (Financial Modeling Prep):</label>
+                <input type="text" id="apiKey" class="w-full p-2 text-sm" placeholder="Ingresa tu API Key gratuita de FMP">
+                <p class="text-xs mt-2">Para obtener datos de mercado en tiempo real para acciones, necesitas una API key gratuita. <a href="https://site.financialmodelingprep.com/developer/docs/" target="_blank" class="underline hover:text-blue-400">Obtén la tuya aquí</a> y pégala arriba. Se guardará localmente.</p>
+            </div>
+        </header>
+
+        <!-- Navegación por Pestañas -->
+        <div class="mb-6 border-b border-gray-700">
+            <nav class="flex space-x-4" aria-label="Tabs">
+                <button class="tab-button active" data-tab="dashboard">
+                    <span class="flex items-center space-x-2 py-3 px-1 text-sm md:text-base font-medium">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10M18 20V4M6 20V16"/></svg>
+                        <span>Mi Portafolio</span>
+                    </span>
+                </button>
+                <button class="tab-button" data-tab="market">
+                     <span class="flex items-center space-x-2 py-3 px-1 text-sm md:text-base font-medium">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 21h19M2.5 3h19M12 3v18M3 12h18"/></svg>
+                        <span>Análisis de Mercado</span>
+                    </span>
+                </button>
+                <button class="tab-button" data-tab="projections">
+                     <span class="flex items-center space-x-2 py-3 px-1 text-sm md:text-base font-medium">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                        <span>Proyecciones</span>
+                    </span>
+                </button>
+            </nav>
+        </div>
+
+        <!-- Contenido de las Pestañas -->
+        <main>
+            <!-- Pestaña 1: Dashboard del Portafolio -->
+            <div id="dashboard" class="space-y-6">
+                <!-- Resumen General -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="card text-center bg-gradient-to-br from-blue-900/80 to-blue-800/80">
+                        <h3 class="text-blue-200 font-medium">Patrimonio Neto</h3>
+                        <p id="netWorth" class="text-3xl font-bold text-white mt-2">$0.00</p>
+                    </div>
+                    <div class="card text-center">
+                        <h3 class="text-gray-400 font-medium">Total Activos</h3>
+                        <p id="totalAssets" class="text-3xl font-bold text-green-400 mt-2">$0.00</p>
+                    </div>
+                    <div class="card text-center">
+                        <h3 class="text-gray-400 font-medium">Total Pasivos</h3>
+                        <p id="totalLiabilities" class="text-3xl font-bold text-red-400 mt-2">$0.00</p>
+                    </div>
+                </div>
+
+                <!-- Formulario para Añadir Activos -->
+                <div class="card">
+                    <h3 class="text-xl font-semibold text-white mb-4">Añadir Nuevo Activo o Pasivo</h3>
+                    <form id="addAssetForm" class="space-y-4">
+                        <div>
+                            <label for="assetType" class="block text-sm font-medium mb-1">Tipo de Registro</label>
+                            <select id="assetType" class="w-full p-2">
+                                <option value="stock">Acción / Fondo (API)</option>
+                                <option value="investment_fund">Fondo (Manual)</option>
+                                <option value="savings">Cuenta de Ahorro</option>
+                                <option value="mortgage">Hipoteca</option>
+                            </select>
+                        </div>
+                        
+                        <div id="stockInputs" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                            <input type="text" id="assetSymbol" placeholder="Símbolo (ej: AAPL)" class="p-2">
+                            <input type="number" id="assetShares" placeholder="Cantidad Acciones" class="p-2" step="any">
+                            <input type="number" id="assetPurchasePrice" placeholder="Precio Compra" class="p-2" step="any">
+                            <input type="number" id="assetAnnualDividend" placeholder="Dividendo Anual/Acción" class="p-2" step="any">
+                            <input type="text" id="assetStockSector" placeholder="Sector (ej: Technology)" class="p-2">
+                        </div>
+
+                        <div id="savingsInputs" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <input type="text" id="savingsName" placeholder="Nombre de la cuenta" class="p-2">
+                            <input type="number" id="savingsInitialBalance" placeholder="Saldo Inicial" class="p-2" step="any">
+                            <input type="number" id="savingsInterestRate" placeholder="Tasa Interés Anual %" class="p-2" step="any">
+                            <input type="date" id="savingsStartDate" placeholder="Fecha de Inicio" class="p-2">
+                        </div>
+                        
+                        <div id="fundInputs" class="hidden grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <input type="text" id="fundName" placeholder="Nombre del Fondo" class="p-2">
+                            <input type="number" id="fundInitialValue" placeholder="Valor Inicial" class="p-2" step="any">
+                             <input type="text" id="fundSector" placeholder="Sector" class="p-2">
+                        </div>
+
+                        <div id="mortgageInputs" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <input type="text" id="mortgageName" placeholder="Nombre de la hipoteca" class="p-2">
+                            <input type="number" id="mortgageOriginalLoan" placeholder="Monto Original" class="p-2" step="any">
+                            <input type="number" id="mortgageInterestRate" placeholder="Tasa Interés Anual %" class="p-2" step="any">
+                        </div>
+
+                        <button type="submit" class="btn-primary p-2 w-full md:w-auto">Añadir</button>
+                    </form>
+                </div>
+
+                <!-- Tabla de Activos -->
+                <div class="card overflow-x-auto">
+                    <h3 class="text-xl font-semibold text-white mb-4">Mis Activos</h3>
+                    <table class="w-full text-left">
+                        <thead class="text-gray-400">
+                            <tr>
+                                <th class="p-2">Activo</th>
+                                <th class="p-2">Categoría</th>
+                                <th class="p-2">Valor Actual</th>
+                                <th class="p-2">Ganancia/Pérdida</th>
+                                <th class="p-2">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="assetsTableBody" class="divide-y divide-gray-700"></tbody>
+                    </table>
+                     <div id="assetsLoader" class="hidden justify-center p-4"><div class="loader"></div></div>
+                </div>
+
+                 <!-- Tabla de Pasivos -->
+                <div class="card overflow-x-auto">
+                    <h3 class="text-xl font-semibold text-white mb-4">Mis Pasivos (Hipotecas)</h3>
+                    <table class="w-full text-left">
+                        <thead class="text-gray-400">
+                            <tr>
+                                <th class="p-2">Hipoteca</th>
+                                <th class="p-2">Monto Original</th>
+                                <th class="p-2">Tasa de Interés</th>
+                                <th class="p-2">Saldo Restante</th>
+                                <th class="p-2">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="liabilitiesTableBody" class="divide-y divide-gray-700"></tbody>
+                    </table>
+                </div>
+                
+                <!-- Gráficos de Análisis -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="card">
+                        <h3 class="text-xl font-semibold text-white mb-4">Distribución de Activos</h3>
+                        <canvas id="sectorAllocationChart"></canvas>
+                    </div>
+                    <div class="card">
+                        <h3 class="text-xl font-semibold text-white mb-4">Ingresos Pasivos por Categoría</h3>
+                        <canvas id="gainsVsDividendsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pestaña 2: Análisis de Mercado -->
+            <div id="market" class="hidden space-y-6">
+                <div class="card">
+                    <h3 class="text-xl font-semibold text-white mb-4">Resumen de Índices Principales</h3>
+                    <div id="marketLoader" class="flex justify-center p-4"><div class="loader"></div></div>
+                    <div id="marketData" class="hidden grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div id="sp500Data" class="p-4 bg-gray-900/50 rounded-lg"></div>
+                        <div id="nasdaqData" class="p-4 bg-gray-900/50 rounded-lg"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pestaña 3: Proyecciones -->
+            <div id="projections" class="hidden space-y-6">
+                 <div class="card">
+                    <h3 class="text-xl font-semibold text-white mb-4">Calculadora de Interés Compuesto</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="space-y-4">
+                            <div>
+                                <label for="initialInvestment" class="block text-sm font-medium">Inversión Inicial ($)</label>
+                                <input type="number" id="initialInvestment" value="1000" class="w-full p-2 mt-1">
+                            </div>
+                            <div>
+                                <label for="monthlyContribution" class="block text-sm font-medium">Aportación Mensual ($)</label>
+                                <input type="number" id="monthlyContribution" value="200" class="w-full p-2 mt-1">
+                            </div>
+                            <div>
+                                <label for="annualRate" class="block text-sm font-medium">Tasa de Interés Anual (%)</label>
+                                <input type="number" id="annualRate" value="8" class="w-full p-2 mt-1">
+                            </div>
+                            <div>
+                                <label for="investmentPeriod" class="block text-sm font-medium">Período de Inversión (Años)</label>
+                                <input type="number" id="investmentPeriod" value="10" class="w-full p-2 mt-1">
+                            </div>
+                            <button id="calculateProjectionBtn" class="btn-primary w-full p-2">Calcular Proyección</button>
+                        </div>
+                        <div class="mt-6 md:mt-0">
+                             <div id="projectionSummary" class="text-center space-y-4">
+                                <div>
+                                    <h4 class="text-gray-400">Valor Futuro Estimado</h4>
+                                    <p id="futureValue" class="text-3xl font-bold text-white">$0.00</p>
+                                </div>
+                                 <div>
+                                    <h4 class="text-gray-400">Total Aportado</h4>
+                                    <p id="totalContributed" class="text-xl font-semibold text-blue-400">$0.00</p>
+                                </div>
+                                 <div>
+                                    <h4 class="text-gray-400">Ganancias por Interés</h4>
+                                    <p id="totalInterest" class="text-xl font-semibold text-green-400">$0.00</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                 <div class="card">
+                    <h3 class="text-xl font-semibold text-white mb-4">Crecimiento de la Inversión</h3>
+                    <canvas id="projectionChart"></canvas>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <!-- Modals -->
+    <div id="mainModal" class="modal-backdrop hidden">
+        <div class="card modal-content">
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="modalTitle" class="text-xl font-semibold text-white"></h3>
+                <button id="closeModalBtn" class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
+            </div>
+            <div id="modalBody" class="overflow-y-auto"></div>
+        </div>
+    </div>
+
+
+<script>
+// --- CONFIGURACIÓN Y ESTADO INICIAL ---
+let portfolio = [];
+let apiKey = localStorage.getItem('investmentDashboardApiKey') || '';
+const FMP_BASE_URL = 'https://financialmodelingprep.com/api/v3';
+
+let sectorChart, gainsDividendsChart, projectionChartInstance;
+
+// --- INICIALIZACIÓN DE ELEMENTOS ---
+const apiKeyInput = document.getElementById('apiKey');
+const assetTypeSelect = document.getElementById('assetType');
+const stockInputsDiv = document.getElementById('stockInputs');
+const savingsInputsDiv = document.getElementById('savingsInputs');
+const fundInputsDiv = document.getElementById('fundInputs');
+const mortgageInputsDiv = document.getElementById('mortgageInputs');
+
+apiKeyInput.value = apiKey;
+
+// --- MANEJO DE EVENTOS ---
+function setupEventListeners() {
+    apiKeyInput.addEventListener('change', (e) => {
+        apiKey = e.target.value;
+        localStorage.setItem('investmentDashboardApiKey', apiKey);
+        showToast('API Key guardada. Refrescando datos...');
+        saveAndRender();
+    });
+
+    assetTypeSelect.addEventListener('change', (e) => {
+        const type = e.target.value;
+        stockInputsDiv.style.display = type === 'stock' ? 'grid' : 'none';
+        savingsInputsDiv.style.display = type === 'savings' ? 'grid' : 'none';
+        fundInputsDiv.style.display = type === 'investment_fund' ? 'grid' : 'none';
+        mortgageInputsDiv.style.display = type === 'mortgage' ? 'grid' : 'none';
+    });
+
+    document.getElementById('addAssetForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const assetType = assetTypeSelect.value;
+        let newEntry;
+        const today = new Date().toISOString().split('T')[0];
+
+        if (assetType === 'stock') {
+            newEntry = { id: Date.now(), type: 'stock', symbol: document.getElementById('assetSymbol').value.toUpperCase(), shares: parseFloat(document.getElementById('assetShares').value), purchasePrice: parseFloat(document.getElementById('assetPurchasePrice').value), sector: document.getElementById('assetStockSector').value || 'Acciones', annualDividend: parseFloat(document.getElementById('assetAnnualDividend').value) || 0 };
+        } else if (assetType === 'savings') {
+             const initialBalance = parseFloat(document.getElementById('savingsInitialBalance').value);
+            newEntry = { id: Date.now(), type: 'savings', name: document.getElementById('savingsName').value, interestRate: parseFloat(document.getElementById('savingsInterestRate').value), sector: 'Ahorros', transactions: [{ date: document.getElementById('savingsStartDate').value || today, amount: initialBalance, note: 'Saldo inicial' }]};
+        } else if (assetType === 'investment_fund') {
+            const initialValue = parseFloat(document.getElementById('fundInitialValue').value);
+            newEntry = { id: Date.now(), type: 'investment_fund', name: document.getElementById('fundName').value, sector: document.getElementById('fundSector').value || 'Fondos', transactions: [{ date: today, amount: initialValue, note: 'Valor inicial' }] };
+        } else { // mortgage
+             newEntry = { id: Date.now(), type: 'mortgage', name: document.getElementById('mortgageName').value, originalLoan: parseFloat(document.getElementById('mortgageOriginalLoan').value), interestRate: parseFloat(document.getElementById('mortgageInterestRate').value), payments: [] };
+        }
+        
+        portfolio.push(newEntry);
+        saveAndRender();
+        e.target.reset();
+        assetTypeSelect.dispatchEvent(new Event('change'));
+    });
+
+    document.querySelectorAll('.tab-button').forEach(button => {
+        button.addEventListener('click', () => changeTab(button.dataset.tab));
+    });
+
+    document.getElementById('calculateProjectionBtn').addEventListener('click', calculateProjections);
+    document.getElementById('closeModalBtn').addEventListener('click', closeModal);
+}
+
+
+// --- LÓGICA DE NAVEGACIÓN POR PESTAÑAS ---
+function changeTab(tabName) {
+    document.querySelectorAll('main > div').forEach(tab => tab.classList.add('hidden'));
+    document.getElementById(tabName).classList.remove('hidden');
+
+    document.querySelectorAll('.tab-button').forEach(button => {
+        button.classList.remove('active');
+        if (button.dataset.tab === tabName) button.classList.add('active');
+    });
+
+    if(tabName === 'market' && !document.getElementById('marketData').innerHTML.trim()) {
+        fetchMarketData();
+    }
+    if (tabName === 'projections') {
+       calculateProjections();
+    }
+}
+
+// --- LÓGICA PRINCIPAL DEL DASHBOARD ---
+function loadPortfolio() {
+    const savedPortfolio = localStorage.getItem('investmentDashboardPortfolio');
+    if (savedPortfolio) {
+        portfolio = JSON.parse(savedPortfolio);
+    } else {
+        // Precargar datos del CSV
+        portfolio = [
+            // Activos
+            {id: 1, type: 'savings', name: 'Cta. Ahorros BG', interestRate: 1.5, sector: 'Ahorros', transactions: [{date: '2023-11-01', amount: 26000, note: 'Saldo inicial'}]},
+            {id: 2, type: 'savings', name: 'Global Bank', interestRate: 4.5, sector: 'Ahorros', transactions: [{date: '2022-01-01', amount: 30000, note: 'Saldo inicial'}]},
+            {id: 3, type: 'savings', name: 'Cta. Ahorro IT Consulting', interestRate: 1.0, sector: 'Ahorros', transactions: [{date: '2025-01-01', amount: 9835, note: 'Saldo inicial'}]},
+            {id: 4, type: 'investment_fund', name: 'Clave', sector: 'Fondos', transactions: [{date: '2025-01-01', amount: 400, note: 'Valor inicial'}]},
+            {id: 5, type: 'investment_fund', name: 'Caja Fuerte', sector: 'Efectivo', transactions: [{date: '2025-01-01', amount: 10000, note: 'Valor inicial'}]},
+            {id: 6, type: 'investment_fund', name: 'Ahorro Poliza Vida (Edson)', sector: 'Seguros', transactions: [{date: '2025-01-01', amount: 16546, note: 'Valor inicial'}]},
+            {id: 7, type: 'investment_fund', name: 'Ahorro Poliza Vida (Monique)', sector: 'Seguros', transactions: [{date: '2025-01-01', amount: 12792, note: 'Valor inicial'}]},
+            {id: 8, type: 'investment_fund', name: 'Progreso Cesantía (Edson)', sector: 'Fondos de Pensión', transactions: [{date: '2025-01-01', amount: 13593.73, note: 'Valor inicial'}]},
+            {id: 9, type: 'investment_fund', name: 'Progreso Cesantía (Monique)', sector: 'Fondos de Pensión', transactions: [{date: '2025-01-01', amount: 10435.82, note: 'Valor inicial'}]},
+            {id: 10, type: 'stock', symbol: 'RL360', shares: 1, purchasePrice: 50000, sector: 'Fondos de Inversión', annualDividend: 0},
+            {id: 11, type: 'stock', symbol: 'PERSHING', shares: 1, purchasePrice: 20000, sector: 'Acciones', annualDividend: 0},
+            {id: 12, type: 'stock', symbol: 'BONOS-SW', shares: 1, purchasePrice: 80000, sector: 'Bonos', annualDividend: 5600},
+
+            // Pasivos
+            {id: 101, type: 'mortgage', name: 'Hipoteca Solutions', originalLoan: 200000, interestRate: 5.5, payments: [{date: '2025-01-01', amount: 50000, note: 'Abono inicial'}]},
+            {id: 102, type: 'mortgage', name: 'Hipoteca Hyde Park', originalLoan: 250000, interestRate: 6.0, payments: [{date: '2025-01-01', amount: 40000, note: 'Abono inicial'}]},
+            {id: 103, type: 'mortgage', name: 'Hipoteca Embassy', originalLoan: 300000, interestRate: 5.8, payments: [{date: '2025-01-01', amount: 20000, note: 'Abono inicial'}]},
+        ];
+    }
+
+    saveAndRender();
+}
+
+function deleteEntry(id) {
+    portfolio = portfolio.filter(p => p.id !== id);
+    saveAndRender();
+}
+
+async function fetchAllAssetPrices() {
+    const stockAssets = portfolio.filter(a => a.type === 'stock' && a.symbol);
+    if (stockAssets.length === 0) {
+        render();
+        return;
+    }
+    
+    if (!apiKey) {
+        render();
+        return;
+    }
+
+    document.getElementById('assetsLoader').style.display = 'flex';
+    const symbols = stockAssets.map(a => a.symbol).join(',');
+    
+    try {
+        const response = await fetch(`${FMP_BASE_URL}/quote/${symbols}?apikey=${apiKey}`);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const data = await response.json();
+        
+        const dataArray = Array.isArray(data) ? data : [data];
+        dataArray.forEach(quote => {
+            const asset = portfolio.find(a => a.symbol === quote.symbol);
+            if (asset) asset.currentPrice = quote.price;
+        });
+    } catch (error) {
+        console.error("Error fetching asset prices:", error);
+        showToast('Algunos símbolos no fueron encontrados. Se usarán precios de compra.', 'error');
+    } finally {
+        document.getElementById('assetsLoader').style.display = 'none';
+        render();
+    }
+}
+
+function calculateBalanceFromTransactions(asset) {
+    if (!asset.transactions || asset.transactions.length === 0) return 0;
+    return asset.transactions.reduce((sum, t) => sum + t.amount, 0);
+}
+
+
+function calculateMortgageBalance(mortgage) {
+    const totalPaid = mortgage.payments.reduce((sum, p) => sum + p.amount, 0);
+    return mortgage.originalLoan - totalPaid;
+}
+
+function saveAndRender() {
+    localStorage.setItem('investmentDashboardPortfolio', JSON.stringify(portfolio));
+    fetchAllAssetPrices();
+}
+
+// --- FUNCIONES DE RENDERIZADO ---
+function render() {
+    renderTables();
+    renderSummary();
+    renderCharts();
+}
+
+function renderTables() {
+    const assetsTableBody = document.getElementById('assetsTableBody');
+    const liabilitiesTableBody = document.getElementById('liabilitiesTableBody');
+    assetsTableBody.innerHTML = '';
+    liabilitiesTableBody.innerHTML = '';
+    
+    const assets = portfolio.filter(p => p.type !== 'mortgage');
+    const liabilities = portfolio.filter(p => p.type === 'mortgage');
+
+    if (assets.length === 0) {
+        assetsTableBody.innerHTML = `<tr><td colspan="5" class="text-center p-4 text-gray-500">No hay activos registrados.</td></tr>`;
+    } else {
+        assets.forEach(asset => {
+            const row = document.createElement('tr');
+            let currentValue, gainLoss = 0;
+            let name = asset.type === 'stock' ? asset.symbol : asset.name;
+
+            if (asset.type === 'stock') {
+                currentValue = asset.shares * (asset.currentPrice || asset.purchasePrice);
+                gainLoss = currentValue - (asset.shares * asset.purchasePrice);
+            } else if (asset.type === 'savings' || asset.type === 'investment_fund') {
+                currentValue = calculateBalanceFromTransactions(asset);
+                const initialValue = asset.transactions[0]?.amount || 0;
+                gainLoss = currentValue - initialValue;
+            }
+            
+            row.innerHTML = `<td class="p-2 font-medium text-white">${name}</td> <td class="p-2">${asset.sector}</td> <td class="p-2 font-semibold">${formatCurrency(currentValue)}</td>`;
+            const gainLossClass = gainLoss >= 0 ? 'positive' : 'negative';
+            
+            row.innerHTML += `<td class="p-2 ${gainLossClass}">${formatCurrency(gainLoss)}</td>
+                <td class="p-2 space-x-1 whitespace-nowrap">
+                    <button onclick="openEditAssetModal(${asset.id})" class="btn-secondary text-xs px-2 py-1">Editar</button>
+                    ${asset.type !== 'stock' ? `<button onclick="openAddTransactionModal(${asset.id})" class="btn-primary text-xs px-2 py-1">Movimiento</button> <button onclick="openAssetHistoryModal(${asset.id})" class="btn-secondary text-xs px-2 py-1">Historial</button>` : ''}
+                    <button onclick="deleteEntry(${asset.id})" class="btn-danger text-xs px-2 py-1">X</button>
+                </td>`;
+            assetsTableBody.appendChild(row);
+        });
+    }
+
+    if (liabilities.length === 0) {
+        liabilitiesTableBody.innerHTML = `<tr><td colspan="5" class="text-center p-4 text-gray-500">No hay pasivos registrados.</td></tr>`;
+    } else {
+        liabilities.forEach(asset => {
+            const currentBalance = calculateMortgageBalance(asset);
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td class="p-2 font-medium text-white">${asset.name}</td>
+                <td class="p-2">${formatCurrency(asset.originalLoan)}</td>
+                <td class="p-2">${asset.interestRate}%</td>
+                <td class="p-2 font-semibold text-red-400">${formatCurrency(currentBalance)}</td>
+                <td class="p-2 space-x-1 whitespace-nowrap">
+                    <button onclick="openAddPaymentModal(${asset.id})" class="btn-primary text-xs px-2 py-1">Añadir Abono</button>
+                    <button onclick="openHistoryModal(${asset.id})" class="btn-secondary text-xs px-2 py-1">Historial</button>
+                    <button onclick="openEditMortgageModal(${asset.id})" class="btn-secondary text-xs px-2 py-1">Editar</button>
+                    <button onclick="deleteEntry(${asset.id})" class="btn-danger text-xs px-2 py-1">X</button>
+                </td>
+            `;
+            liabilitiesTableBody.appendChild(row);
+        });
+    }
+}
+
+function renderSummary() {
+    let totalAssets = 0;
+    let totalLiabilities = 0;
+
+    portfolio.forEach(asset => {
+        if (asset.type === 'stock') {
+            totalAssets += asset.shares * (asset.currentPrice || asset.purchasePrice);
+        } else if (asset.type === 'savings' || asset.type === 'investment_fund') {
+            totalAssets += calculateBalanceFromTransactions(asset);
+        } else if (asset.type === 'mortgage') {
+            totalLiabilities += calculateMortgageBalance(asset);
+        }
+    });
+
+    const netWorth = totalAssets - totalLiabilities;
+    document.getElementById('netWorth').textContent = formatCurrency(netWorth);
+    document.getElementById('totalAssets').textContent = formatCurrency(totalAssets);
+    document.getElementById('totalLiabilities').textContent = formatCurrency(totalLiabilities);
+}
+
+function renderCharts() {
+    const assets = portfolio.filter(p => p.type !== 'mortgage');
+    const sectorData = assets.reduce((acc, asset) => {
+        const sector = asset.sector || 'Sin Categoría';
+        if (!acc[sector]) acc[sector] = { value: 0, income: 0 };
+        
+        let currentValue = 0;
+        if(asset.type === 'stock') {
+            currentValue = asset.shares * (asset.currentPrice || asset.purchasePrice);
+            acc[sector].income += asset.shares * asset.annualDividend;
+        } else if (asset.type === 'savings' || asset.type === 'investment_fund') {
+            currentValue = calculateBalanceFromTransactions(asset);
+            const positiveTransactions = asset.transactions.slice(1).filter(t => t.amount > 0);
+            acc[sector].income += positiveTransactions.reduce((sum, t) => sum + t.amount, 0);
+        }
+        acc[sector].value += currentValue;
+
+        return acc;
+    }, {});
+
+    const labels = Object.keys(sectorData);
+    const sectorValues = labels.map(label => sectorData[label].value);
+    const incomeValues = labels.map(label => sectorData[label].income);
+    const colors = ['#3b82f6', '#10b981', '#f97316', '#8b5cf6', '#ec4899', '#f59e0b', '#14b8a6', '#6366f1'];
+
+    const sectorCtx = document.getElementById('sectorAllocationChart').getContext('2d');
+    if (sectorChart) sectorChart.destroy();
+    sectorChart = new Chart(sectorCtx, { type: 'doughnut', data: { labels: labels, datasets: [{ data: sectorValues, backgroundColor: colors, borderColor: '#1f2937' }] }, options: { responsive: true, plugins: { legend: { position: 'top', labels: { color: '#d1d5db' } } } } });
+
+    const gainsCtx = document.getElementById('gainsVsDividendsChart').getContext('2d');
+    if (gainsDividendsChart) gainsDividendsChart.destroy();
+    gainsDividendsChart = new Chart(gainsCtx, { type: 'bar', data: { labels: labels, datasets: [{ label: 'Ingresos / Ganancia', data: incomeValues, backgroundColor: colors[1] }] }, options: { responsive: true, scales: { x: { ticks: { color: '#d1d5db' } }, y: { ticks: { color: '#d1d5db' } } }, plugins: { legend: { display: false } } } });
+}
+
+// --- LÓGICA DE ANÁLISIS DE MERCADO ---
+async function fetchMarketData() {
+    if (!apiKey) {
+        showToast('Se necesita una API Key para el análisis de mercado.', 'info');
+        document.getElementById('marketLoader').style.display = 'none';
+        document.getElementById('marketData').innerHTML = `<p class="text-center col-span-2 text-gray-500">Ingresa tu API Key arriba.</p>`;
+        document.getElementById('marketData').style.display = 'grid';
+        return;
+    }
+    
+    document.getElementById('marketLoader').style.display = 'flex';
+    document.getElementById('marketData').style.display = 'none';
+
+    try {
+        const [sp500Quote, nasdaqQuote] = await Promise.all([
+            fetch(`${FMP_BASE_URL}/quote/^GSPC?apikey=${apiKey}`).then(res => res.json()),
+            fetch(`${FMP_BASE_URL}/quote/^IXIC?apikey=${apiKey}`).then(res => res.json())
+        ]);
+        const spData = sp500Quote[0], nqData = nasdaqQuote[0];
+        if (spData) document.getElementById('sp500Data').innerHTML = createMarketCardHTML('S&P 500 (^GSPC)', spData);
+        if (nqData) document.getElementById('nasdaqData').innerHTML = createMarketCardHTML('NASDAQ Composite (^IXIC)', nqData);
+    } catch (error) {
+        console.error("Error fetching market data:", error);
+        showToast('Error al obtener datos de mercado.', 'error');
+        document.getElementById('marketData').innerHTML = `<p class="text-center col-span-2 text-red-400">Hubo un error al cargar los datos.</p>`;
+    } finally {
+        document.getElementById('marketLoader').style.display = 'none';
+        document.getElementById('marketData').style.display = 'grid';
+    }
+}
+
+function createMarketCardHTML(name, data) {
+    if (!data) return '<p>Datos no disponibles.</p>';
+    const changeClass = data.change >= 0 ? 'positive' : 'negative';
+    return `<h4 class="text-lg font-bold text-white mb-2">${name}</h4> <div class="flex justify-between items-baseline"> <p class="text-2xl font-bold">${formatCurrency(data.price)}</p> <p class="text-lg font-semibold ${changeClass}">${data.change.toFixed(2)} (${data.changesPercentage.toFixed(2)}%)</p> </div> <div class="mt-4 border-t border-gray-700 pt-2 text-sm space-y-1"> <p><strong>Apertura:</strong> ${formatCurrency(data.open)}</p> <p><strong>Máx/Mín Hoy:</strong> ${formatCurrency(data.dayHigh)} / ${formatCurrency(data.dayLow)}</p> </div>`;
+}
+
+// --- LÓGICA DE PROYECCIONES ---
+function calculateProjections() {
+    const initial = parseFloat(document.getElementById('initialInvestment').value);
+    const monthly = parseFloat(document.getElementById('monthlyContribution').value);
+    const rate = parseFloat(document.getElementById('annualRate').value) / 100;
+    const years = parseInt(document.getElementById('investmentPeriod').value);
+    const monthlyRate = rate / 12;
+    let futureValue = initial;
+    let projectionData = [{year: 0, value: initial, contribution: initial}];
+    let totalContribution = initial;
+    for (let i = 1; i <= years; i++) {
+        for (let j = 0; j < 12; j++) futureValue = futureValue * (1 + monthlyRate) + monthly;
+        totalContribution += monthly * 12;
+        projectionData.push({ year: i, value: futureValue, contribution: totalContribution });
+    }
+    document.getElementById('futureValue').textContent = formatCurrency(futureValue);
+    document.getElementById('totalContributed').textContent = formatCurrency(totalContribution);
+    document.getElementById('totalInterest').textContent = formatCurrency(futureValue - totalContribution);
+    renderProjectionChart(projectionData);
+}
+
+function renderProjectionChart(data) {
+    const ctx = document.getElementById('projectionChart').getContext('2d');
+    if (projectionChartInstance) projectionChartInstance.destroy();
+    projectionChartInstance = new Chart(ctx, { type: 'line', data: { labels: data.map(d => `Año ${d.year}`), datasets: [ { label: 'Total Aportado', data: data.map(d => d.contribution), borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.2)', fill: true, tension: 0.1 }, { label: 'Valor Total', data: data.map(d => d.value), borderColor: '#22c55e', backgroundColor: 'rgba(34, 197, 94, 0.2)', fill: true, tension: 0.1 } ] }, options: { responsive: true, scales: { x: { ticks: { color: '#d1d5db' }, grid: { color: '#374151' } }, y: { ticks: { color: '#d1d5db', callback: value => formatCurrency(value) }, grid: { color: '#374151' } } }, plugins: { legend: { labels: { color: '#d1d5db' } }, tooltip: { callbacks: { label: context => `${context.dataset.label}: ${formatCurrency(context.raw)}` } } } } });
+}
+
+// --- LÓGICA DEL MODAL ---
+function openModal(title, bodyHTML) {
+    document.getElementById('modalTitle').textContent = title;
+    document.getElementById('modalBody').innerHTML = bodyHTML;
+    document.getElementById('mainModal').classList.remove('hidden');
+}
+
+function closeModal() {
+    document.getElementById('mainModal').classList.add('hidden');
+}
+
+function openAssetHistoryModal(assetId) {
+    const asset = portfolio.find(a => a.id === assetId);
+    if (!asset) return;
+    let tableHTML = `<table class="w-full text-left"><thead class="text-gray-400"><tr><th class="p-2">Fecha</th><th class="p-2">Monto</th><th class="p-2">Nota</th></tr></thead><tbody class="divide-y divide-gray-700">`;
+    if(asset.transactions.length === 0){
+        tableHTML += `<tr><td colspan="3" class="text-center p-4 text-gray-500">No hay movimientos registrados.</td></tr>`;
+    } else {
+        [...asset.transactions].sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(t => {
+             const amountClass = t.amount >= 0 ? 'positive' : 'negative';
+             tableHTML += `<tr><td class="p-2">${t.date}</td><td class="p-2 ${amountClass}">${formatCurrency(t.amount)}</td><td class="p-2">${t.note || ''}</td></tr>`;
+        });
+    }
+    tableHTML += `</tbody></table>`;
+    openModal(`Historial de: ${asset.name}`, tableHTML);
+}
+
+
+function openAddTransactionModal(assetId) {
+    const asset = portfolio.find(a => a.id === assetId);
+    if (!asset) return;
+    const today = new Date().toISOString().split('T')[0];
+    const bodyHTML = `
+        <form id="addTransactionForm" data-id="${assetId}" class="space-y-4">
+            <div>
+                <label for="transactionAmount" class="block text-sm font-medium">Monto del Movimiento</label>
+                <input type="number" id="transactionAmount" placeholder="Positivo para ingresos, negativo para retiros" class="w-full p-2 mt-1" step="any" required>
+            </div>
+            <div>
+                <label for="transactionDate" class="block text-sm font-medium">Fecha</label>
+                <input type="date" id="transactionDate" value="${today}" class="w-full p-2 mt-1" required>
+            </div>
+            <div>
+                <label for="transactionNote" class="block text-sm font-medium">Nota (ej: Intereses, Aporte, Retiro)</label>
+                <input type="text" id="transactionNote" class="w-full p-2 mt-1">
+            </div>
+            <button type="submit" class="btn-primary w-full p-2">Guardar Movimiento</button>
+        </form>
+    `;
+    openModal(`Añadir Movimiento a ${asset.name}`, bodyHTML);
+    document.getElementById('addTransactionForm').addEventListener('submit', handleAddTransaction);
+}
+
+function handleAddTransaction(e) {
+    e.preventDefault();
+    const assetId = parseInt(e.target.dataset.id);
+    const asset = portfolio.find(a => a.id === assetId);
+    if(asset) {
+        asset.transactions.push({
+            date: document.getElementById('transactionDate').value,
+            amount: parseFloat(document.getElementById('transactionAmount').value),
+            note: document.getElementById('transactionNote').value
+        });
+        saveAndRender();
+        closeModal();
+        showToast('Movimiento guardado.');
+    }
+}
+
+function openEditAssetModal(assetId) {
+    const asset = portfolio.find(a => a.id === assetId);
+    if (!asset) return;
+    let formHTML = '';
+    const today = new Date().toISOString().split('T')[0];
+
+    if(asset.type === 'stock') {
+        formHTML = `
+            <div><label for="editAssetSymbol" class="block text-sm font-medium">Símbolo</label><input type="text" id="editAssetSymbol" value="${asset.symbol}" class="w-full p-2 mt-1" required></div>
+            <div><label for="editAssetShares" class="block text-sm font-medium">Cantidad</label><input type="number" id="editAssetShares" value="${asset.shares}" class="w-full p-2 mt-1" step="any" required></div>
+            <div><label for="editAssetPurchasePrice" class="block text-sm font-medium">Precio Compra</label><input type="number" id="editAssetPurchasePrice" value="${asset.purchasePrice}" class="w-full p-2 mt-1" step="any" required></div>
+            <div><label for="editAssetAnnualDividend" class="block text-sm font-medium">Dividendo Anual/Acción</label><input type="number" id="editAssetAnnualDividend" value="${asset.annualDividend}" class="w-full p-2 mt-1" step="any" required></div>
+            <div><label for="editAssetSector" class="block text-sm font-medium">Sector</label><input type="text" id="editAssetSector" value="${asset.sector}" class="w-full p-2 mt-1" required></div>
+        `;
+    } else { // Covers savings and investment_fund
+        const initialTransaction = asset.transactions[0] || { amount: 0, date: today, note: '' };
+        formHTML = `
+            <div><label for="editAssetName" class="block text-sm font-medium">Nombre</label><input type="text" id="editAssetName" value="${asset.name}" class="w-full p-2 mt-1" required></div>
+            ${asset.type === 'savings' ? `<div><label for="editAssetInterestRate" class="block text-sm font-medium">Tasa Interés Anual (%)</label><input type="number" id="editAssetInterestRate" value="${asset.interestRate}" class="w-full p-2 mt-1" step="any" required></div>` : `<div><label for="editAssetSector" class="block text-sm font-medium">Sector</label><input type="text" id="editAssetSector" value="${asset.sector}" class="w-full p-2 mt-1" required></div>`}
+            <div><label for="editInitialBalance" class="block text-sm font-medium">Saldo Inicial</label><input type="number" id="editInitialBalance" value="${initialTransaction.amount.toFixed(2)}" class="w-full p-2 mt-1" step="any" required></div>
+            <div><label for="editInitialDate" class="block text-sm font-medium">Fecha Inicial</label><input type="date" id="editInitialDate" value="${initialTransaction.date}" class="w-full p-2 mt-1" required></div>
+        `;
+    }
+    
+    const bodyHTML = `<form id="editAssetForm" data-id="${assetId}" class="space-y-4">${formHTML}<button type="submit" class="btn-primary w-full p-2 mt-4">Guardar Cambios</button></form>`;
+    openModal(`Editar Activo: ${asset.name || asset.symbol}`, bodyHTML);
+    document.getElementById('editAssetForm').addEventListener('submit', handleEditAsset);
+}
+
+
+function handleEditAsset(e) {
+    e.preventDefault();
+    const assetId = parseInt(e.target.dataset.id);
+    const asset = portfolio.find(a => a.id === assetId);
+    if(asset) {
+        if(asset.type === 'stock') {
+            asset.symbol = document.getElementById('editAssetSymbol').value.toUpperCase();
+            asset.shares = parseFloat(document.getElementById('editAssetShares').value);
+            asset.purchasePrice = parseFloat(document.getElementById('editAssetPurchasePrice').value);
+            asset.annualDividend = parseFloat(document.getElementById('editAssetAnnualDividend').value);
+            asset.sector = document.getElementById('editAssetSector').value;
+        } else { // Covers savings and investment_fund
+            asset.name = document.getElementById('editAssetName').value;
+            
+            if (asset.type === 'savings') {
+                asset.interestRate = parseFloat(document.getElementById('editAssetInterestRate').value);
+            } else { // investment_fund
+                asset.sector = document.getElementById('editAssetSector').value;
+            }
+
+            const newInitialBalance = parseFloat(document.getElementById('editInitialBalance').value);
+            const newInitialDate = document.getElementById('editInitialDate').value;
+            
+            if (asset.transactions && asset.transactions.length > 0) {
+                asset.transactions[0].amount = newInitialBalance;
+                asset.transactions[0].date = newInitialDate;
+            } else { // Should not happen with current logic, but safe to have
+                asset.transactions = [{
+                    date: newInitialDate,
+                    amount: newInitialBalance,
+                    note: 'Saldo inicial (corregido)'
+                }];
+            }
+        }
+        saveAndRender();
+        closeModal();
+        showToast('Activo actualizado.');
+    }
+}
+
+
+function openHistoryModal(mortgageId) {
+    const mortgage = portfolio.find(m => m.id === mortgageId);
+    if (!mortgage) return;
+    let tableHTML = `<div class="text-gray-300 mb-4">Total Pagado: <strong class="text-white">${formatCurrency(mortgage.originalLoan - calculateMortgageBalance(mortgage))}</strong></div>`;
+    tableHTML += `<table class="w-full text-left"><thead class="text-gray-400"><tr><th class="p-2">Fecha</th><th class="p-2">Monto Abono</th><th class="p-2">Nota</th></tr></thead><tbody class="divide-y divide-gray-700">`;
+    if(mortgage.payments.length === 0){
+        tableHTML += `<tr><td colspan="3" class="text-center p-4 text-gray-500">No hay abonos registrados.</td></tr>`;
+    } else {
+        [...mortgage.payments].sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(p => {
+             tableHTML += `<tr><td class="p-2">${p.date}</td><td class="p-2">${formatCurrency(p.amount)}</td><td class="p-2">${p.note || ''}</td></tr>`;
+        });
+    }
+    tableHTML += `</tbody></table>`;
+    openModal(`Historial de Abonos: ${mortgage.name}`, tableHTML);
+}
+
+function openAddPaymentModal(mortgageId) {
+    const mortgage = portfolio.find(m => m.id === mortgageId);
+    if (!mortgage) return;
+    const today = new Date().toISOString().split('T')[0];
+    const bodyHTML = `
+        <form id="addPaymentForm" data-id="${mortgageId}" class="space-y-4">
+            <div>
+                <label for="paymentAmount" class="block text-sm font-medium">Monto del Abono</label>
+                <input type="number" id="paymentAmount" class="w-full p-2 mt-1" step="any" required>
+            </div>
+            <div>
+                <label for="paymentDate" class="block text-sm font-medium">Fecha del Abono</label>
+                <input type="date" id="paymentDate" value="${today}" class="w-full p-2 mt-1" required>
+            </div>
+            <div>
+                <label for="paymentNote" class="block text-sm font-medium">Nota (Opcional)</label>
+                <input type="text" id="paymentNote" class="w-full p-2 mt-1">
+            </div>
+            <button type="submit" class="btn-primary w-full p-2">Guardar Abono</button>
+        </form>
+    `;
+    openModal(`Añadir Abono a ${mortgage.name}`, bodyHTML);
+    document.getElementById('addPaymentForm').addEventListener('submit', handleAddPayment);
+}
+
+function handleAddPayment(e) {
+    e.preventDefault();
+    const mortgageId = parseInt(e.target.dataset.id);
+    const mortgage = portfolio.find(m => m.id === mortgageId);
+    if(mortgage) {
+        mortgage.payments.push({
+            date: document.getElementById('paymentDate').value,
+            amount: parseFloat(document.getElementById('paymentAmount').value),
+            note: document.getElementById('paymentNote').value
+        });
+        saveAndRender();
+        closeModal();
+        showToast('Abono guardado exitosamente.');
+    }
+}
+
+function openEditMortgageModal(mortgageId) {
+    const mortgage = portfolio.find(m => m.id === mortgageId);
+    if (!mortgage) return;
+    const bodyHTML = `
+        <form id="editMortgageForm" data-id="${mortgageId}" class="space-y-4">
+            <div>
+                <label for="editMortgageName" class="block text-sm font-medium">Nombre</label>
+                <input type="text" id="editMortgageName" value="${mortgage.name}" class="w-full p-2 mt-1" required>
+            </div>
+            <div>
+                <label for="editOriginalLoan" class="block text-sm font-medium">Monto Original</label>
+                <input type="number" id="editOriginalLoan" value="${mortgage.originalLoan}" class="w-full p-2 mt-1" step="any" required>
+            </div>
+            <div>
+                <label for="editInterestRate" class="block text-sm font-medium">Tasa de Interés (%)</label>
+                <input type="number" id="editInterestRate" value="${mortgage.interestRate}" class="w-full p-2 mt-1" step="any" required>
+            </div>
+            <button type="submit" class="btn-primary w-full p-2">Guardar Cambios</button>
+        </form>
+    `;
+    openModal(`Editar Hipoteca: ${mortgage.name}`, bodyHTML);
+    document.getElementById('editMortgageForm').addEventListener('submit', handleEditMortgage);
+}
+
+function handleEditMortgage(e) {
+    e.preventDefault();
+    const mortgageId = parseInt(e.target.dataset.id);
+    const mortgage = portfolio.find(m => m.id === mortgageId);
+    if(mortgage) {
+        mortgage.name = document.getElementById('editMortgageName').value;
+        mortgage.originalLoan = parseFloat(document.getElementById('editOriginalLoan').value);
+        mortgage.interestRate = parseFloat(document.getElementById('editInterestRate').value);
+        saveAndRender();
+        closeModal();
+        showToast('Hipoteca actualizada.');
+    }
+}
+
+
+// --- UTILIDADES ---
+function formatCurrency(value) {
+    if (typeof value !== 'number') value = 0;
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+}
+
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    const bgColor = type === 'error' ? 'bg-red-500' : 'bg-blue-600';
+    toast.className = `fixed bottom-5 right-5 ${bgColor} text-white py-2 px-4 rounded-lg shadow-lg z-50`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
+}
+
+// --- INICIALIZACIÓN ---
+document.addEventListener('DOMContentLoaded', () => {
+    setupEventListeners();
+    loadPortfolio();
+    calculateProjections();
+    assetTypeSelect.dispatchEvent(new Event('change'));
+});
+
+</script>
+</body>
+</html>
