@@ -97,6 +97,13 @@
             max-height: 90vh;
             overflow-y: auto;
         }
+        /* Custom Toggle Switch */
+        .switch { position: relative; display: inline-block; width: 34px; height: 20px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #4b5563; transition: .4s; border-radius: 20px; }
+        .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #3b82f6; }
+        input:checked + .slider:before { transform: translateX(14px); }
     </style>
 </head>
 <body class="p-4 md:p-8">
@@ -328,7 +335,7 @@ let portfolio = [];
 let apiKey = localStorage.getItem('investmentDashboardApiKey') || '';
 const FMP_BASE_URL = 'https://financialmodelingprep.com/api/v3';
 
-let sectorChart, gainsDividendsChart, projectionChartInstance;
+let sectorChart, gainsDividendsChart, projectionChartInstance, stockChartInstance;
 
 // --- INICIALIZACIÓN DE ELEMENTOS ---
 const apiKeyInput = document.getElementById('apiKey');
@@ -364,7 +371,17 @@ function setupEventListeners() {
         const today = new Date().toISOString().split('T')[0];
 
         if (assetType === 'stock') {
-            newEntry = { id: Date.now(), type: 'stock', symbol: document.getElementById('assetSymbol').value.toUpperCase(), shares: parseFloat(document.getElementById('assetShares').value), purchasePrice: parseFloat(document.getElementById('assetPurchasePrice').value), sector: document.getElementById('assetStockSector').value || 'Acciones', annualDividend: parseFloat(document.getElementById('assetAnnualDividend').value) || 0 };
+            const shares = parseFloat(document.getElementById('assetShares').value);
+            const price = parseFloat(document.getElementById('assetPurchasePrice').value);
+            newEntry = { 
+                id: Date.now(), 
+                type: 'stock', 
+                symbol: document.getElementById('assetSymbol').value.toUpperCase(), 
+                sector: document.getElementById('assetStockSector').value || 'Acciones', 
+                annualDividend: parseFloat(document.getElementById('assetAnnualDividend').value) || 0,
+                monitoring: true,
+                transactions: [{ date: today, shares: shares, price: price, note: 'Compra inicial' }]
+            };
         } else if (assetType === 'savings') {
              const initialBalance = parseFloat(document.getElementById('savingsInitialBalance').value);
             newEntry = { id: Date.now(), type: 'savings', name: document.getElementById('savingsName').value, interestRate: parseFloat(document.getElementById('savingsInterestRate').value), sector: 'Ahorros', transactions: [{ date: document.getElementById('savingsStartDate').value || today, amount: initialBalance, note: 'Saldo inicial' }]};
@@ -412,28 +429,33 @@ function changeTab(tabName) {
 function loadPortfolio() {
     const savedPortfolio = localStorage.getItem('investmentDashboardPortfolio');
     if (savedPortfolio) {
-        portfolio = JSON.parse(savedPortfolio);
+        portfolio = JSON.parse(savedPortfolio).map(asset => {
+            if (asset.type === 'stock') {
+                if (!asset.transactions) { // Migration for older format
+                    asset.transactions = [{
+                        date: new Date().toISOString().split('T')[0],
+                        shares: asset.shares,
+                        price: asset.purchasePrice,
+                        note: 'Compra inicial (migrado)'
+                    }];
+                    delete asset.shares;
+                    delete asset.purchasePrice;
+                }
+                if (asset.monitoring === undefined) {
+                    asset.monitoring = true; // Default to true if not present
+                }
+            }
+            return asset;
+        });
     } else {
-        // Precargar datos del CSV
+        // Precargar datos
         portfolio = [
-            // Activos
             {id: 1, type: 'savings', name: 'Cta. Ahorros BG', interestRate: 1.5, sector: 'Ahorros', transactions: [{date: '2023-11-01', amount: 26000, note: 'Saldo inicial'}]},
-            {id: 2, type: 'savings', name: 'Global Bank', interestRate: 4.5, sector: 'Ahorros', transactions: [{date: '2022-01-01', amount: 30000, note: 'Saldo inicial'}]},
-            {id: 3, type: 'savings', name: 'Cta. Ahorro IT Consulting', interestRate: 1.0, sector: 'Ahorros', transactions: [{date: '2025-01-01', amount: 9835, note: 'Saldo inicial'}]},
-            {id: 4, type: 'investment_fund', name: 'Clave', sector: 'Fondos', transactions: [{date: '2025-01-01', amount: 400, note: 'Valor inicial'}]},
-            {id: 5, type: 'investment_fund', name: 'Caja Fuerte', sector: 'Efectivo', transactions: [{date: '2025-01-01', amount: 10000, note: 'Valor inicial'}]},
-            {id: 6, type: 'investment_fund', name: 'Ahorro Poliza Vida (Edson)', sector: 'Seguros', transactions: [{date: '2025-01-01', amount: 16546, note: 'Valor inicial'}]},
-            {id: 7, type: 'investment_fund', name: 'Ahorro Poliza Vida (Monique)', sector: 'Seguros', transactions: [{date: '2025-01-01', amount: 12792, note: 'Valor inicial'}]},
             {id: 8, type: 'investment_fund', name: 'Progreso Cesantía (Edson)', sector: 'Fondos de Pensión', transactions: [{date: '2025-01-01', amount: 13593.73, note: 'Valor inicial'}]},
-            {id: 9, type: 'investment_fund', name: 'Progreso Cesantía (Monique)', sector: 'Fondos de Pensión', transactions: [{date: '2025-01-01', amount: 10435.82, note: 'Valor inicial'}]},
-            {id: 10, type: 'stock', symbol: 'RL360', shares: 1, purchasePrice: 50000, sector: 'Fondos de Inversión', annualDividend: 0},
-            {id: 11, type: 'stock', symbol: 'PERSHING', shares: 1, purchasePrice: 20000, sector: 'Acciones', annualDividend: 0},
-            {id: 12, type: 'stock', symbol: 'BONOS-SW', shares: 1, purchasePrice: 80000, sector: 'Bonos', annualDividend: 5600},
-
-            // Pasivos
+            {id: 10, type: 'stock', symbol: 'RL360', sector: 'Fondos de Inversión', annualDividend: 0, monitoring: true, transactions: [{date: '2024-01-01', shares: 1, price: 50000, note: 'Compra inicial'}]},
+            {id: 11, type: 'stock', symbol: 'AAPL', sector: 'Acciones', annualDividend: 0.96, monitoring: true, transactions: [{date: '2023-05-10', shares: 10, price: 170, note: 'Compra inicial'}]},
+            {id: 12, type: 'stock', symbol: 'BONOS-SW', sector: 'Bonos', annualDividend: 5600, monitoring: false, transactions: [{date: '2022-01-01', shares: 1, price: 80000, note: 'Compra inicial'}]},
             {id: 101, type: 'mortgage', name: 'Hipoteca Solutions', originalLoan: 200000, interestRate: 5.5, payments: [{date: '2025-01-01', amount: 50000, note: 'Abono inicial'}]},
-            {id: 102, type: 'mortgage', name: 'Hipoteca Hyde Park', originalLoan: 250000, interestRate: 6.0, payments: [{date: '2025-01-01', amount: 40000, note: 'Abono inicial'}]},
-            {id: 103, type: 'mortgage', name: 'Hipoteca Embassy', originalLoan: 300000, interestRate: 5.8, payments: [{date: '2025-01-01', amount: 20000, note: 'Abono inicial'}]},
         ];
     }
 
@@ -441,14 +463,16 @@ function loadPortfolio() {
 }
 
 function deleteEntry(id) {
-    portfolio = portfolio.filter(p => p.id !== id);
-    saveAndRender();
+    if (confirm('¿Estás seguro de que quieres eliminar este registro?')) {
+        portfolio = portfolio.filter(p => p.id !== id);
+        saveAndRender();
+    }
 }
 
 async function fetchAllAssetPrices() {
-    const stockAssets = portfolio.filter(a => a.type === 'stock' && a.symbol);
+    const stockAssets = portfolio.filter(a => a.type === 'stock' && a.symbol && a.monitoring);
     if (stockAssets.length === 0) {
-        render();
+        render(); // Still render to update UI with non-monitored prices
         return;
     }
     
@@ -467,7 +491,7 @@ async function fetchAllAssetPrices() {
         
         const dataArray = Array.isArray(data) ? data : [data];
         dataArray.forEach(quote => {
-            const asset = portfolio.find(a => a.symbol === quote.symbol);
+            const asset = portfolio.find(a => a.symbol === quote.symbol && a.monitoring);
             if (asset) asset.currentPrice = quote.price;
         });
     } catch (error) {
@@ -479,11 +503,21 @@ async function fetchAllAssetPrices() {
     }
 }
 
+function toggleMonitoring(assetId) {
+    const asset = portfolio.find(a => a.id === assetId);
+    if (asset && asset.type === 'stock') {
+        asset.monitoring = !asset.monitoring;
+        if (!asset.monitoring) {
+            delete asset.currentPrice; // Remove current price when monitoring is off
+        }
+        saveAndRender();
+    }
+}
+
 function calculateBalanceFromTransactions(asset) {
     if (!asset.transactions || asset.transactions.length === 0) return 0;
     return asset.transactions.reduce((sum, t) => sum + t.amount, 0);
 }
-
 
 function calculateMortgageBalance(mortgage) {
     const totalPaid = mortgage.payments.reduce((sum, p) => sum + p.amount, 0);
@@ -516,12 +550,15 @@ function renderTables() {
     } else {
         assets.forEach(asset => {
             const row = document.createElement('tr');
-            let currentValue, gainLoss = 0;
+            let currentValue = 0, gainLoss = 0;
             let name = asset.type === 'stock' ? asset.symbol : asset.name;
 
             if (asset.type === 'stock') {
-                currentValue = asset.shares * (asset.currentPrice || asset.purchasePrice);
-                gainLoss = currentValue - (asset.shares * asset.purchasePrice);
+                const totalShares = asset.transactions.reduce((sum, t) => sum + (t.shares || 0), 0);
+                const costBasis = asset.transactions.reduce((sum, t) => sum + ((t.shares || 0) * (t.price || 0)), 0);
+                const avgPurchasePrice = totalShares > 0 ? costBasis / totalShares : 0;
+                currentValue = totalShares * (asset.currentPrice || avgPurchasePrice);
+                gainLoss = currentValue - costBasis;
             } else if (asset.type === 'savings' || asset.type === 'investment_fund') {
                 currentValue = calculateBalanceFromTransactions(asset);
                 const initialValue = asset.transactions[0]?.amount || 0;
@@ -531,12 +568,31 @@ function renderTables() {
             row.innerHTML = `<td class="p-2 font-medium text-white">${name}</td> <td class="p-2">${asset.sector}</td> <td class="p-2 font-semibold">${formatCurrency(currentValue)}</td>`;
             const gainLossClass = gainLoss >= 0 ? 'positive' : 'negative';
             
-            row.innerHTML += `<td class="p-2 ${gainLossClass}">${formatCurrency(gainLoss)}</td>
-                <td class="p-2 space-x-1 whitespace-nowrap">
-                    <button onclick="openEditAssetModal(${asset.id})" class="btn-secondary text-xs px-2 py-1">Editar</button>
-                    ${asset.type !== 'stock' ? `<button onclick="openAddTransactionModal(${asset.id})" class="btn-primary text-xs px-2 py-1">Movimiento</button> <button onclick="openAssetHistoryModal(${asset.id})" class="btn-secondary text-xs px-2 py-1">Historial</button>` : ''}
-                    <button onclick="deleteEntry(${asset.id})" class="btn-danger text-xs px-2 py-1">X</button>
-                </td>`;
+            let actionsHTML = '';
+            if (asset.type === 'stock') {
+                actionsHTML = `
+                    <div class="flex items-center justify-end space-x-2">
+                        <span class="text-xs text-gray-400">Monitorear</span>
+                        <label class="switch">
+                            <input type="checkbox" onchange="toggleMonitoring(${asset.id})" ${asset.monitoring ? 'checked' : ''}>
+                            <span class="slider"></span>
+                        </label>
+                        <button onclick="openStockChartModal(${asset.id})" class="btn-secondary text-xs px-2 py-1">Gráfico</button>
+                        <button onclick="openAddStockTransactionModal(${asset.id})" class="btn-primary text-xs px-2 py-1">+/-</button>
+                        <button onclick="openAssetHistoryModal(${asset.id})" class="btn-secondary text-xs px-2 py-1">Hist.</button>
+                        <button onclick="deleteEntry(${asset.id})" class="btn-danger text-xs px-2 py-1">X</button>
+                    </div>`;
+            } else {
+                actionsHTML = `
+                    <div class="flex items-center justify-end space-x-2">
+                        <button onclick="openEditAssetModal(${asset.id})" class="btn-secondary text-xs px-2 py-1">Editar</button>
+                        <button onclick="openAddTransactionModal(${asset.id})" class="btn-primary text-xs px-2 py-1">Mov.</button>
+                        <button onclick="openAssetHistoryModal(${asset.id})" class="btn-secondary text-xs px-2 py-1">Hist.</button>
+                        <button onclick="deleteEntry(${asset.id})" class="btn-danger text-xs px-2 py-1">X</button>
+                    </div>`;
+            }
+            
+            row.innerHTML += `<td class="p-2 ${gainLossClass}">${formatCurrency(gainLoss)}</td><td class="p-2">${actionsHTML}</td>`;
             assetsTableBody.appendChild(row);
         });
     }
@@ -570,7 +626,10 @@ function renderSummary() {
 
     portfolio.forEach(asset => {
         if (asset.type === 'stock') {
-            totalAssets += asset.shares * (asset.currentPrice || asset.purchasePrice);
+            const totalShares = asset.transactions.reduce((sum, t) => sum + (t.shares || 0), 0);
+            const costBasis = asset.transactions.reduce((sum, t) => sum + ((t.shares || 0) * (t.price || 0)), 0);
+            const avgPurchasePrice = totalShares > 0 ? costBasis / totalShares : 0;
+            totalAssets += totalShares * (asset.currentPrice || avgPurchasePrice);
         } else if (asset.type === 'savings' || asset.type === 'investment_fund') {
             totalAssets += calculateBalanceFromTransactions(asset);
         } else if (asset.type === 'mortgage') {
@@ -592,8 +651,11 @@ function renderCharts() {
         
         let currentValue = 0;
         if(asset.type === 'stock') {
-            currentValue = asset.shares * (asset.currentPrice || asset.purchasePrice);
-            acc[sector].income += asset.shares * asset.annualDividend;
+            const totalShares = asset.transactions.reduce((sum, t) => sum + (t.shares || 0), 0);
+            const costBasis = asset.transactions.reduce((sum, t) => sum + ((t.shares || 0) * (t.price || 0)), 0);
+            const avgPurchasePrice = totalShares > 0 ? costBasis / totalShares : 0;
+            currentValue = totalShares * (asset.currentPrice || avgPurchasePrice);
+            acc[sector].income += totalShares * asset.annualDividend;
         } else if (asset.type === 'savings' || asset.type === 'investment_fund') {
             currentValue = calculateBalanceFromTransactions(asset);
             const positiveTransactions = asset.transactions.slice(1).filter(t => t.amount > 0);
@@ -691,22 +753,157 @@ function openModal(title, bodyHTML) {
 
 function closeModal() {
     document.getElementById('mainModal').classList.add('hidden');
+    if (stockChartInstance) {
+        stockChartInstance.destroy();
+    }
 }
+
+async function openStockChartModal(assetId) {
+    const asset = portfolio.find(a => a.id === assetId);
+    if (!asset || asset.type !== 'stock') return;
+
+    const modalBody = `
+        <div class="flex justify-center items-center h-64" id="chartLoader">
+            <div class="loader"></div>
+        </div>
+        <canvas id="stockHistoryChart"></canvas>
+    `;
+    openModal(`Historial de Precios: ${asset.symbol}`, modalBody);
+
+    if (!apiKey) {
+        document.getElementById('chartLoader').innerHTML = '<p class="text-red-400">Se necesita una API Key para ver el historial.</p>';
+        return;
+    }
+
+    try {
+        const oneYearAgo = new Date();
+        oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+        const fromDate = oneYearAgo.toISOString().split('T')[0];
+
+        const response = await fetch(`${FMP_BASE_URL}/historical-price-full/${asset.symbol}?from=${fromDate}&apikey=${apiKey}`);
+        if (!response.ok) throw new Error('No se pudieron obtener los datos históricos.');
+        
+        const data = await response.json();
+        if (!data.historical) throw new Error('Símbolo no encontrado o sin datos históricos.');
+        
+        const historicalData = data.historical.reverse();
+
+        const labels = historicalData.map(d => d.date);
+        const prices = historicalData.map(d => d.close);
+        
+        document.getElementById('chartLoader').style.display = 'none';
+        const ctx = document.getElementById('stockHistoryChart').getContext('2d');
+        
+        if (stockChartInstance) stockChartInstance.destroy();
+
+        stockChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: `Precio de Cierre (${asset.symbol})`,
+                    data: prices,
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    fill: true,
+                    tension: 0.1,
+                    pointRadius: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                     x: { ticks: { color: '#d1d5db', maxTicksLimit: 12 }, grid: { color: '#374151' } },
+                     y: { ticks: { color: '#d1d5db', callback: value => formatCurrency(value) }, grid: { color: '#374151' } }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: context => `${context.dataset.label}: ${formatCurrency(context.raw)}` } }
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error("Error fetching historical data:", error);
+        document.getElementById('chartLoader').innerHTML = `<p class="text-red-400">${error.message}</p>`;
+    }
+}
+
 
 function openAssetHistoryModal(assetId) {
     const asset = portfolio.find(a => a.id === assetId);
     if (!asset) return;
-    let tableHTML = `<table class="w-full text-left"><thead class="text-gray-400"><tr><th class="p-2">Fecha</th><th class="p-2">Monto</th><th class="p-2">Nota</th></tr></thead><tbody class="divide-y divide-gray-700">`;
-    if(asset.transactions.length === 0){
-        tableHTML += `<tr><td colspan="3" class="text-center p-4 text-gray-500">No hay movimientos registrados.</td></tr>`;
-    } else {
-        [...asset.transactions].sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(t => {
-             const amountClass = t.amount >= 0 ? 'positive' : 'negative';
-             tableHTML += `<tr><td class="p-2">${t.date}</td><td class="p-2 ${amountClass}">${formatCurrency(t.amount)}</td><td class="p-2">${t.note || ''}</td></tr>`;
-        });
+    
+    let tableHTML;
+    if (asset.type === 'stock') {
+        tableHTML = `<table class="w-full text-left"><thead class="text-gray-400"><tr><th class="p-2">Fecha</th><th class="p-2">Acciones</th><th class="p-2">Precio</th><th class="p-2">Total</th><th class="p-2">Nota</th></tr></thead><tbody class="divide-y divide-gray-700">`;
+        if(asset.transactions.length === 0){
+             tableHTML += `<tr><td colspan="5" class="text-center p-4 text-gray-500">No hay movimientos.</td></tr>`;
+        } else {
+             [...asset.transactions].sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(t => {
+                const amountClass = t.shares >= 0 ? 'positive' : 'negative';
+                tableHTML += `<tr><td class="p-2">${t.date}</td><td class="p-2 ${amountClass}">${(t.shares || 0).toFixed(4)}</td><td class="p-2">${formatCurrency(t.price)}</td><td class="p-2">${formatCurrency(t.shares * t.price)}</td><td class="p-2">${t.note || ''}</td></tr>`;
+            });
+        }
+    } else { // savings or investment_fund
+        tableHTML = `<table class="w-full text-left"><thead class="text-gray-400"><tr><th class="p-2">Fecha</th><th class="p-2">Monto</th><th class="p-2">Nota</th></tr></thead><tbody class="divide-y divide-gray-700">`;
+        if(asset.transactions.length === 0){
+            tableHTML += `<tr><td colspan="3" class="text-center p-4 text-gray-500">No hay movimientos.</td></tr>`;
+        } else {
+            [...asset.transactions].sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(t => {
+                 const amountClass = t.amount >= 0 ? 'positive' : 'negative';
+                 tableHTML += `<tr><td class="p-2">${t.date}</td><td class="p-2 ${amountClass}">${formatCurrency(t.amount)}</td><td class="p-2">${t.note || ''}</td></tr>`;
+            });
+        }
     }
     tableHTML += `</tbody></table>`;
-    openModal(`Historial de: ${asset.name}`, tableHTML);
+    openModal(`Historial de: ${asset.name || asset.symbol}`, tableHTML);
+}
+
+function openAddStockTransactionModal(assetId) {
+    const asset = portfolio.find(a => a.id === assetId);
+    if (!asset) return;
+    const today = new Date().toISOString().split('T')[0];
+    const bodyHTML = `
+        <form id="addStockTransactionForm" data-id="${assetId}" class="space-y-4">
+            <div>
+                <label for="stockShares" class="block text-sm font-medium">Cantidad de Acciones</label>
+                <input type="number" id="stockShares" placeholder="Positivo para compra, negativo para venta" class="w-full p-2 mt-1" step="any" required>
+            </div>
+            <div>
+                <label for="stockPrice" class="block text-sm font-medium">Precio por Acción</label>
+                <input type="number" id="stockPrice" placeholder="Precio en el momento de la transacción" class="w-full p-2 mt-1" step="any" required>
+            </div>
+            <div>
+                <label for="stockDate" class="block text-sm font-medium">Fecha</label>
+                <input type="date" id="stockDate" value="${today}" class="w-full p-2 mt-1" required>
+            </div>
+            <div>
+                <label for="stockNote" class="block text-sm font-medium">Nota</label>
+                <input type="text" id="stockNote" class="w-full p-2 mt-1">
+            </div>
+            <button type="submit" class="btn-primary w-full p-2">Guardar Movimiento</button>
+        </form>
+    `;
+    openModal(`Añadir Movimiento a ${asset.symbol}`, bodyHTML);
+    document.getElementById('addStockTransactionForm').addEventListener('submit', handleAddStockTransaction);
+}
+
+function handleAddStockTransaction(e) {
+    e.preventDefault();
+    const assetId = parseInt(e.target.dataset.id);
+    const asset = portfolio.find(a => a.id === assetId);
+    if(asset) {
+        asset.transactions.push({
+            date: document.getElementById('stockDate').value,
+            shares: parseFloat(document.getElementById('stockShares').value),
+            price: parseFloat(document.getElementById('stockPrice').value),
+            note: document.getElementById('stockNote').value
+        });
+        saveAndRender();
+        closeModal();
+        showToast('Movimiento de acción guardado.');
+    }
 }
 
 
@@ -758,15 +955,16 @@ function openEditAssetModal(assetId) {
     const today = new Date().toISOString().split('T')[0];
 
     if(asset.type === 'stock') {
+        const initialTransaction = asset.transactions[0] || { shares: 0, price: 0 };
         formHTML = `
             <div><label for="editAssetSymbol" class="block text-sm font-medium">Símbolo</label><input type="text" id="editAssetSymbol" value="${asset.symbol}" class="w-full p-2 mt-1" required></div>
-            <div><label for="editAssetShares" class="block text-sm font-medium">Cantidad</label><input type="number" id="editAssetShares" value="${asset.shares}" class="w-full p-2 mt-1" step="any" required></div>
-            <div><label for="editAssetPurchasePrice" class="block text-sm font-medium">Precio Compra</label><input type="number" id="editAssetPurchasePrice" value="${asset.purchasePrice}" class="w-full p-2 mt-1" step="any" required></div>
+            <div><label for="editAssetShares" class="block text-sm font-medium">Cantidad Inicial</label><input type="number" id="editAssetShares" value="${initialTransaction.shares}" class="w-full p-2 mt-1" step="any" required></div>
+            <div><label for="editAssetPurchasePrice" class="block text-sm font-medium">Precio Compra Inicial</label><input type="number" id="editAssetPurchasePrice" value="${initialTransaction.price}" class="w-full p-2 mt-1" step="any" required></div>
             <div><label for="editAssetAnnualDividend" class="block text-sm font-medium">Dividendo Anual/Acción</label><input type="number" id="editAssetAnnualDividend" value="${asset.annualDividend}" class="w-full p-2 mt-1" step="any" required></div>
             <div><label for="editAssetSector" class="block text-sm font-medium">Sector</label><input type="text" id="editAssetSector" value="${asset.sector}" class="w-full p-2 mt-1" required></div>
         `;
     } else { // Covers savings and investment_fund
-        const initialTransaction = asset.transactions[0] || { amount: 0, date: today, note: '' };
+        const initialTransaction = asset.transactions[0] || { amount: 0, date: today };
         formHTML = `
             <div><label for="editAssetName" class="block text-sm font-medium">Nombre</label><input type="text" id="editAssetName" value="${asset.name}" class="w-full p-2 mt-1" required></div>
             ${asset.type === 'savings' ? `<div><label for="editAssetInterestRate" class="block text-sm font-medium">Tasa Interés Anual (%)</label><input type="number" id="editAssetInterestRate" value="${asset.interestRate}" class="w-full p-2 mt-1" step="any" required></div>` : `<div><label for="editAssetSector" class="block text-sm font-medium">Sector</label><input type="text" id="editAssetSector" value="${asset.sector}" class="w-full p-2 mt-1" required></div>`}
@@ -788,31 +986,27 @@ function handleEditAsset(e) {
     if(asset) {
         if(asset.type === 'stock') {
             asset.symbol = document.getElementById('editAssetSymbol').value.toUpperCase();
-            asset.shares = parseFloat(document.getElementById('editAssetShares').value);
-            asset.purchasePrice = parseFloat(document.getElementById('editAssetPurchasePrice').value);
             asset.annualDividend = parseFloat(document.getElementById('editAssetAnnualDividend').value);
             asset.sector = document.getElementById('editAssetSector').value;
+            // Edit initial transaction
+            if(asset.transactions && asset.transactions.length > 0) {
+                asset.transactions[0].shares = parseFloat(document.getElementById('editAssetShares').value);
+                asset.transactions[0].price = parseFloat(document.getElementById('editAssetPurchasePrice').value);
+            }
         } else { // Covers savings and investment_fund
             asset.name = document.getElementById('editAssetName').value;
-            
             if (asset.type === 'savings') {
                 asset.interestRate = parseFloat(document.getElementById('editAssetInterestRate').value);
             } else { // investment_fund
                 asset.sector = document.getElementById('editAssetSector').value;
             }
-
             const newInitialBalance = parseFloat(document.getElementById('editInitialBalance').value);
             const newInitialDate = document.getElementById('editInitialDate').value;
-            
             if (asset.transactions && asset.transactions.length > 0) {
                 asset.transactions[0].amount = newInitialBalance;
                 asset.transactions[0].date = newInitialDate;
-            } else { // Should not happen with current logic, but safe to have
-                asset.transactions = [{
-                    date: newInitialDate,
-                    amount: newInitialBalance,
-                    note: 'Saldo inicial (corregido)'
-                }];
+            } else {
+                asset.transactions = [{ date: newInitialDate, amount: newInitialBalance, note: 'Saldo inicial (corregido)' }];
             }
         }
         saveAndRender();
@@ -944,3 +1138,4 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 </body>
 </html>
+
