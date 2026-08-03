@@ -3930,7 +3930,22 @@
         window.supa = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
       } catch(e) {}
     }
-
+<script>
+  // PARCHE DE EMERGENCIA PARA LOS CLICS DEL MENÚ
+  document.addEventListener("DOMContentLoaded", function() {
+    setTimeout(function() {
+      const menuLinks = document.querySelectorAll('aside a, nav a, .sidebar a, [class*="menu"], [class*="nav"]');
+      menuLinks.forEach(link => {
+        link.addEventListener("click", function(e) {
+          // Si el enlace tiene un href interno o data-target, dejamos que la app actúe, 
+          // pero aseguramos la clase activa visual
+          menuLinks.forEach(el => el.classList.remove("active", "selected"));
+          this.classList.add("active");
+        });
+      });
+    }, 1000);
+  });
+</script>
     // Encender píldora verde
     const cloudPill = document.getElementById("cloudPill");
     if (cloudPill) {
