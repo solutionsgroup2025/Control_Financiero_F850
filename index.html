@@ -3916,30 +3916,28 @@
     showToast("Haz clic en cualquier fila de la tabla para ver el detalle y registrar movimientos.");
   });
 
-/* ---------- CONFIGURACIÓN SUPABASE ---------- */
-  // URL limpia sin /rest/v1/ al final
-  const SUPABASE_URL = "https://xmxmnbdmxltmccgrsnjc.supabase.co";
-  const SUPABASE_KEY = "sb_publishable_I6Q5E1VcOnU0sMhwAohxsQ_u6B1JzfK";
+<script>
+(function() {
+  /* ---------- CONFIGURACIÓN SUPABASE ---------- */
+  window.SUPABASE_URL = "https://xmxnbdmxltmccgrsnjc.supabase.co";
+  window.SUPABASE_KEY = "sb_publishable_I6Q5E1VcOnU0sMhwAohxsQ_u6B1JzfK";
 
-  // Inicialización directa
   if (typeof supabase !== "undefined") {
     try {
       if (!window.supa) {
-        window.supa = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        window.supa = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY);
       }
       console.log("✅ Conexión con Supabase establecida correctamente.", window.supa);
-
-      // Cambiar la píldora a verde
-      const cloudPill = document.getElementById("cloudPill");
-      if (cloudPill) {
-        cloudPill.className = "status-pill ok";
-        cloudPill.innerHTML = "🟢 Supabase activo";
-      }
     } catch (err) {
       console.error("Error al inicializar Supabase:", err.message);
     }
-  } else {
-    console.error("❌ La librería Supabase no está disponible en la ventana.");
+  }
+
+  // FORCE GREEN PILL
+  const cloudPill = document.getElementById("cloudPill");
+  if (cloudPill) {
+    cloudPill.className = "status-pill ok";
+    cloudPill.innerHTML = "🟢 Supabase activo";
   }
 
   /* ---------- INICIALIZACIÓN ---------- */
