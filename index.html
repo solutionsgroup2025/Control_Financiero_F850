@@ -3923,19 +3923,32 @@
 
   // Inicialización de la instancia Supabase
 /* ---------- CONFIGURACIÓN Y CONEXIÓN SUPABASE ---------- */
-  const SUPABASE_URL = "https://tu-proyecto.supabase.co"; // Cambia por tu URL
-  const SUPABASE_KEY = "tu-anon-public-key-aqui";        // Cambia por tu Key
+  const SUPABASE_URL = "https://xmxmnbdmxltmccgrsnjc.supabase.co/rest/v1/"; // Cambia por tu URL
+  const SUPABASE_KEY = "sb_publishable_I6Q5E1VcOnU0sMhwAohxsQ_u6B1JzfK";        // Cambia por tu Key
 
   var supa = null;
 
-  // Accedemos explícitamente al objeto global de la CDN (window.supabase)
-  if (window.supabase && SUPABASE_URL !== "https://tu-proyecto.supabase.co") {
+  /* ---------- CONFIGURACIÓN SUPABASE ---------- */
+  const SUPABASE_URL = "https://xmxmnbdmxltmccgrsnjc.supabase.co/rest/v1/"; // Pon tu URL real de Supabase
+  const SUPABASE_KEY = "sb_publishable_I6Q5E1VcOnU0sMhwAohxsQ_u6B1JzfK";            // Pon tu anon/public Key real
+
+  // Eliminamos la validación estricta para asegurar que intente conectar
+  if (window.supabase && SUPABASE_URL.includes("supabase.co")) {
     try {
       supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
       console.log("Conexión con Supabase establecida correctamente.");
+
+      // Cambia el estado visual en la interfaz
+      const cloudPill = document.getElementById("cloudPill");
+      if (cloudPill) {
+        cloudPill.className = "status-pill ok";
+        cloudPill.innerHTML = "🟢 Supabase activo";
+      }
     } catch (err) {
       console.error("Error al inicializar Supabase:", err.message);
     }
+  } else {
+    console.warn("Verifica que SUPABASE_URL y SUPABASE_KEY tengan valores válidos.");
   }
 
   /* ---------- init ---------- */
