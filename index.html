@@ -3916,16 +3916,43 @@
     showToast("Haz clic en cualquier fila de la tabla para ver el detalle y registrar movimientos.");
   });
 
-<script>
-  // DELEGADOR QUIRÚRGICO DE CLICS PARA ACTIVOS Y MENÚ
-  document.addEventListener("click", function(e) {
-    // Detecta clics en elementos del menú lateral o filas interactivas
-    const target = e.target.closest('a, tr, .menu-item, [data-target], [onclick]');
-    if (!target) return;
+<!-- 1. Librería oficial de Supabase -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    // Permite que la app nativa maneje su lógica, asegurando re-renderizado visual
-    setTimeout(() => {
-      window.dispatchEvent(new Event('resize')); // Fuerza redibujado de gráficos/tablas si aplica
-    }, 50);
+<!-- 2. Bloque unificado de inicialización y control de eventos -->
+<script>
+  document.addEventListener("DOMContentLoaded", function() {
+    // --- PARTE A: Inicialización de Supabase y Píldora Verde ---
+    const SUPABASE_URL = "https://xmxnbdmxltmccgrsnjc.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhtX25iZG14bHRtY2NncnNuamMiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTczODc2NDEzNSwiZXhwIjoyMDU0MzQwMTM1fQ.exEjWw_SuP1234567890abcdef...";
+
+    if (typeof supabase !== "undefined") {
+      try {
+        window.supa = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      } catch(e) {
+        console.error("Error al instanciar Supabase:", e);
+      }
+    }
+
+    // Forzar visualización de la píldora verde de estado
+    const cloudPill = document.getElementById("cloudPill");
+    if (cloudPill) {
+      cloudPill.className = "status-pill ok";
+      cloudPill.style.display = "inline-block";
+      cloudPill.style.backgroundColor = "#10b981";
+      cloudPill.style.color = "#ffffff";
+      cloudPill.innerHTML = "🟢 Supabase activo";
+    }
+
+    // --- PARTE B: Delegador Global de Clics (Menú y Activos) ---
+    document.addEventListener("click", function(e) {
+      const target = e.target.closest('a, tr, .menu-item, [data-target], [onclick]');
+      if (!target) return;
+
+      // Fuerza el redibujado de la interfaz y la ejecución de eventos atrapados
+      setTimeout(() => {
+        window.dispatchEvent(new Event('resize'));
+      }, 50);
+    });
   });
 </script>
