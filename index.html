@@ -3916,8 +3916,10 @@
     showToast("Haz clic en cualquier fila de la tabla para ver el detalle y registrar movimientos.");
   });
 
+<!-- 1. Cargas la librería de Supabase de manera independiente -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
+<!-- 2. Abres tu bloque de script limpio -->
 <script>
   document.addEventListener("DOMContentLoaded", function() {
     const SUPABASE_URL = "https://xmxnbdmxltmccgrsnjc.supabase.co";
@@ -3929,12 +3931,12 @@
       } catch(e) {}
     }
 
-    // FUERZA BRUTA VISUAL PARA LA PÍLDORA VERDE
+    // Encender píldora verde
     const cloudPill = document.getElementById("cloudPill");
     if (cloudPill) {
       cloudPill.className = "status-pill ok";
       cloudPill.style.display = "inline-block";
-      cloudPill.style.backgroundColor = "#10b981"; // Verde explícito
+      cloudPill.style.backgroundColor = "#10b981";
       cloudPill.style.color = "#ffffff";
       cloudPill.innerHTML = "🟢 Supabase activo";
     }
