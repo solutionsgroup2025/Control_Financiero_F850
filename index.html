@@ -3916,29 +3916,33 @@
     showToast("Haz clic en cualquier fila de la tabla para ver el detalle y registrar movimientos.");
   });
 
-  /* ---------- CONFIGURACIÓN SUPABASE ---------- */
-  // REEMPLAZA LOS VALORES DENTRO DE LAS COMILLAS
-  const SUPABASE_URL = "https://xmxmnbdmxltmccgrsnjc.supabase.co/rest/v1/";
+/* ---------- CONFIGURACIÓN SUPABASE ---------- */
+  // URL limpia sin /rest/v1/ al final
+  const SUPABASE_URL = "https://xmxmnbdmxltmccgrsnjc.supabase.co";
   const SUPABASE_KEY = "sb_publishable_I6Q5E1VcOnU0sMhwAohxsQ_u6B1JzfK";
 
-// Inicializa únicamente si no existe para evitar duplicados
+  // Inicialización directa
   if (typeof supabase !== "undefined") {
-    if (!window.supa) {
-      window.supa = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    try {
+      if (!window.supa) {
+        window.supa = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      }
+      console.log("✅ Conexión con Supabase establecida correctamente.", window.supa);
+
+      // Cambiar la píldora a verde
+      const cloudPill = document.getElementById("cloudPill");
+      if (cloudPill) {
+        cloudPill.className = "status-pill ok";
+        cloudPill.innerHTML = "🟢 Supabase activo";
+      }
+    } catch (err) {
+      console.error("Error al inicializar Supabase:", err.message);
     }
-    
-    // Forzar el cambio visual de la píldora
-    const cloudPill = document.getElementById("cloudPill");
-    if (cloudPill) {
-      cloudPill.className = "status-pill ok";
-      cloudPill.innerHTML = "🟢 Supabase activo";
-    }
-    console.log("✅ Supabase conectado de forma permanente.");
   } else {
-    console.error("❌ No se encontró la librería SDK de Supabase.");
+    console.error("❌ La librería Supabase no está disponible en la ventana.");
   }
 
-  /* ---------- INICIALIZACIÓN DE LA APP ---------- */
+  /* ---------- INICIALIZACIÓN ---------- */
   if (typeof authBootstrap === "function") {
     authBootstrap();
   }
