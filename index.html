@@ -3921,15 +3921,8 @@
   const SUPABASE_URL = "https://xmxmnbdmxltmccgrsnjc.supabase.co/rest/v1/";
   const SUPABASE_KEY = "sb_publishable_I6Q5E1VcOnU0sMhwAohxsQ_u6B1JzfK";
 
-  // Inicialización de la instancia Supabase
-/* ---------- CONFIGURACIÓN Y CONEXIÓN SUPABASE ---------- */
-  const SUPABASE_URL = "https://xmxmnbdmxltmccgrsnjc.supabase.co/rest/v1/"; // Cambia por tu URL
-  const SUPABASE_KEY = "sb_publishable_I6Q5E1VcOnU0sMhwAohxsQ_u6B1JzfK";        // Cambia por tu Key
-
   var supa = null;
-
-  // Eliminamos la validación estricta para asegurar que intente conectar
- if (window.supabase && window.SUPABASE_URL && !window.SUPABASE_URL.includes("tu-proyecto")) {
+if (window.supabase && window.SUPABASE_URL && !window.SUPABASE_URL.includes("tu-proyecto")) {
     try {
       window.supa = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY);
       console.log("Conexión con Supabase establecida correctamente.");
