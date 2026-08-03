@@ -3916,29 +3916,16 @@
     showToast("Haz clic en cualquier fila de la tabla para ver el detalle y registrar movimientos.");
   });
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
 <script>
-  document.addEventListener("DOMContentLoaded", function() {
-    const SUPABASE_URL = "https://xmxnbdmxltmccgrsnjc.supabase.co";
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhtX25iZG14bHRtY2NncnNuamMiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTczODc2NDEzNSwiZXhwIjoyMDU0MzQwMTM1fQ.exEjWw_SuP1234567890abcdef...";
+  // DELEGADOR QUIRÚRGICO DE CLICS PARA ACTIVOS Y MENÚ
+  document.addEventListener("click", function(e) {
+    // Detecta clics en elementos del menú lateral o filas interactivas
+    const target = e.target.closest('a, tr, .menu-item, [data-target], [onclick]');
+    if (!target) return;
 
-    if (typeof supabase !== "undefined") {
-      try {
-        window.supa = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-      } catch(e) {}
-    }
-
-    // FUERZA BRUTA VISUAL PARA LA PÍLDORA VERDE
-    const cloudPill = document.getElementById("cloudPill");
-    if (cloudPill) {
-      cloudPill.className = "status-pill ok";
-      cloudPill.style.display = "inline-block";
-      cloudPill.style.backgroundColor = "#10b981";
-      cloudPill.style.color = "#ffffff";
-      cloudPill.innerHTML = "🟢 Supabase activo";
-    }
+    // Permite que la app nativa maneje su lógica, asegurando re-renderizado visual
+    setTimeout(() => {
+      window.dispatchEvent(new Event('resize')); // Fuerza redibujado de gráficos/tablas si aplica
+    }, 50);
   });
 </script>
-</body>
-</html>
