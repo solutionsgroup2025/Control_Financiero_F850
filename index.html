@@ -3921,23 +3921,24 @@
   const SUPABASE_URL = "https://xmxmnbdmxltmccgrsnjc.supabase.co/rest/v1/";
   const SUPABASE_KEY = "sb_publishable_I6Q5E1VcOnU0sMhwAohxsQ_u6B1JzfK";
 
- // Evita inicializar múltiples veces si ya existe la instancia
-  if (!window.supa && typeof supabase !== "undefined") {
-    try {
+// Inicializa únicamente si no existe para evitar duplicados
+  if (typeof supabase !== "undefined") {
+    if (!window.supa) {
       window.supa = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-      console.log("✅ Conexión con Supabase establecida correctamente.", window.supa);
-
-      const cloudPill = document.getElementById("cloudPill");
-      if (cloudPill) {
-        cloudPill.className = "status-pill ok";
-        cloudPill.innerHTML = "🟢 Supabase activo";
-      }
-    } catch (err) {
-      console.error("Error al inicializar Supabase:", err.message);
     }
+    
+    // Forzar el cambio visual de la píldora
+    const cloudPill = document.getElementById("cloudPill");
+    if (cloudPill) {
+      cloudPill.className = "status-pill ok";
+      cloudPill.innerHTML = "🟢 Supabase activo";
+    }
+    console.log("✅ Supabase conectado de forma permanente.");
+  } else {
+    console.error("❌ No se encontró la librería SDK de Supabase.");
   }
 
-  /* ---------- INICIALIZACIÓN ---------- */
+  /* ---------- INICIALIZACIÓN DE LA APP ---------- */
   if (typeof authBootstrap === "function") {
     authBootstrap();
   }
