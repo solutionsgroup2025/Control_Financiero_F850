@@ -3916,10 +3916,8 @@
     showToast("Haz clic en cualquier fila de la tabla para ver el detalle y registrar movimientos.");
   });
 
-<!-- 1. Cargas la librería de Supabase de manera independiente -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<!-- 2. Abres tu bloque de script limpio -->
 <script>
   document.addEventListener("DOMContentLoaded", function() {
     const SUPABASE_URL = "https://xmxnbdmxltmccgrsnjc.supabase.co";
@@ -3931,23 +3929,7 @@
       } catch(e) {}
     }
 
-    <script>
-  // PARCHE DE EMERGENCIA PARA LOS CLICS DEL MENÚ
-  document.addEventListener("DOMContentLoaded", function() {
-    setTimeout(function() {
-      const menuLinks = document.querySelectorAll('aside a, nav a, .sidebar a, [class*="menu"], [class*="nav"]');
-      menuLinks.forEach(link => {
-        link.addEventListener("click", function(e) {
-          // Si el enlace tiene un href interno o data-target, dejamos que la app actúe, 
-          // pero aseguramos la clase activa visual
-          menuLinks.forEach(el => el.classList.remove("active", "selected"));
-          this.classList.add("active");
-        });
-      });
-    }, 1000);
-  });
-</script>
-    // Encender píldora verde
+    // FUERZA BRUTA VISUAL PARA LA PÍLDORA VERDE
     const cloudPill = document.getElementById("cloudPill");
     if (cloudPill) {
       cloudPill.className = "status-pill ok";
