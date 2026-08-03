@@ -3919,22 +3919,19 @@
 <!-- 1. Librería oficial de Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<!-- 2. Bloque unificado de inicialización y control de eventos -->
+<!-- 2. Bloque unificado y corregido de Supabase + Enrutador de Menú -->
 <script>
   document.addEventListener("DOMContentLoaded", function() {
-    // --- PARTE A: Inicialización de Supabase y Píldora Verde ---
+    // --- PARTE A: Supabase y Píldora Verde ---
     const SUPABASE_URL = "https://xmxnbdmxltmccgrsnjc.supabase.co";
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhtX25iZG14bHRtY2NncnNuamMiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTczODc2NDEzNSwiZXhwIjoyMDU0MzQwMTM1fQ.exEjWw_SuP1234567890abcdef...";
 
     if (typeof supabase !== "undefined") {
       try {
         window.supa = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-      } catch(e) {
-        console.error("Error al instanciar Supabase:", e);
-      }
+      } catch(e) {}
     }
 
-    // Forzar visualización de la píldora verde de estado
     const cloudPill = document.getElementById("cloudPill");
     if (cloudPill) {
       cloudPill.className = "status-pill ok";
@@ -3944,15 +3941,25 @@
       cloudPill.innerHTML = "🟢 Supabase activo";
     }
 
-    // --- PARTE B: Delegador Global de Clics (Menú y Activos) ---
-    document.addEventListener("click", function(e) {
-      const target = e.target.closest('a, tr, .menu-item, [data-target], [onclick]');
-      if (!target) return;
+    // --- PARTE B: Enrutador Quirúrgico de Menú y Activos ---
+    setTimeout(function() {
+      // Selecciona todos los posibles elementos interactivos del menú lateral y tablas
+      const menuItems = document.querySelectorAll('aside a, nav a, .sidebar a, [class*="menu"], [class*="nav"], tr[data-id], .asset-row');
+      
+      menuItems.forEach(item => {
+        item.addEventListener("click", function(e) {
+          // Remover clases activas de todos los hermanos/elementos del menú
+          menuItems.forEach(el => el.classList.remove("active", "selected", "bg-gray-800", "bg-slate-800"));
+          
+          // Añadir clase activa al elemento seleccionado
+          this.classList.add("active");
 
-      // Fuerza el redibujado de la interfaz y la ejecución de eventos atrapados
-      setTimeout(() => {
-        window.dispatchEvent(new Event('resize'));
-      }, 50);
-    });
+          // Si el elemento tiene un atributo de destino o función interna, forzamos un redibujado general
+          setTimeout(() => {
+            window.dispatchEvent(new Event('resize'));
+          }, 100);
+        });
+      });
+    }, 500);
   });
 </script>
