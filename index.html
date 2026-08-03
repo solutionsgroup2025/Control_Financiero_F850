@@ -3922,8 +3922,20 @@
   const SUPABASE_KEY = "sb_publishable_I6Q5E1VcOnU0sMhwAohxsQ_u6B1JzfK";
 
   // Inicialización de la instancia Supabase
-  if (typeof supabase !== "undefined") {
-    var supa = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+/* ---------- CONFIGURACIÓN Y CONEXIÓN SUPABASE ---------- */
+  const SUPABASE_URL = "https://tu-proyecto.supabase.co"; // Cambia por tu URL
+  const SUPABASE_KEY = "tu-anon-public-key-aqui";        // Cambia por tu Key
+
+  var supa = null;
+
+  // Accedemos explícitamente al objeto global de la CDN (window.supabase)
+  if (window.supabase && SUPABASE_URL !== "https://tu-proyecto.supabase.co") {
+    try {
+      supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      console.log("Conexión con Supabase establecida correctamente.");
+    } catch (err) {
+      console.error("Error al inicializar Supabase:", err.message);
+    }
   }
 
   /* ---------- init ---------- */
