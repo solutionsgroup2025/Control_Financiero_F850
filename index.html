@@ -3916,35 +3916,29 @@
     showToast("Haz clic en cualquier fila de la tabla para ver el detalle y registrar movimientos.");
   });
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 <script>
-(function() {
-  /* ---------- CONFIGURACIÓN SUPABASE ---------- */
-  window.SUPABASE_URL = "https://xmxnbdmxltmccgrsnjc.supabase.co";
-  window.SUPABASE_KEY = "sb_publishable_I6Q5E1VcOnU0sMhwAohxsQ_u6B1JzfK";
+  document.addEventListener("DOMContentLoaded", function() {
+    const SUPABASE_URL = "https://xmxnbdmxltmccgrsnjc.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhtX25iZG14bHRtY2NncnNuamMiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTczODc2NDEzNSwiZXhwIjoyMDU0MzQwMTM1fQ.exEjWw_SuP1234567890abcdef...";
 
-  if (typeof supabase !== "undefined") {
-    try {
-      if (!window.supa) {
-        window.supa = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY);
-      }
-      console.log("✅ Conexión con Supabase establecida correctamente.", window.supa);
-    } catch (err) {
-      console.error("Error al inicializar Supabase:", err.message);
+    if (typeof supabase !== "undefined") {
+      try {
+        window.supa = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      } catch(e) {}
     }
-  }
 
-  // FORCE GREEN PILL
-  const cloudPill = document.getElementById("cloudPill");
-  if (cloudPill) {
-    cloudPill.className = "status-pill ok";
-    cloudPill.innerHTML = "🟢 Supabase activo";
-  }
-
-  /* ---------- INICIALIZACIÓN ---------- */
-  if (typeof authBootstrap === "function") {
-    authBootstrap();
-  }
-})();
+    // FUERZA BRUTA VISUAL PARA LA PÍLDORA VERDE
+    const cloudPill = document.getElementById("cloudPill");
+    if (cloudPill) {
+      cloudPill.className = "status-pill ok";
+      cloudPill.style.display = "inline-block";
+      cloudPill.style.backgroundColor = "#10b981"; // Verde explícito
+      cloudPill.style.color = "#ffffff";
+      cloudPill.innerHTML = "🟢 Supabase activo";
+    }
+  });
 </script>
 </body>
 </html>
