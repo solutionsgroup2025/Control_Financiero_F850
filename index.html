@@ -3916,13 +3916,13 @@
     showToast("Haz clic en cualquier fila de la tabla para ver el detalle y registrar movimientos.");
   });
 
-<!-- 1. Librería oficial de Supabase -->
+<!-- 1. Librería oficial de Supabase (Cargada primero y fuera del bloque lógico) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<!-- 2. Bloque unificado y corregido de Supabase + Enrutador de Menú -->
+<!-- 2. Bloque unificado de inicialización, píldora verde y enrutador de menú -->
 <script>
   document.addEventListener("DOMContentLoaded", function() {
-    // --- PARTE A: Supabase y Píldora Verde ---
+    // --- Configuración e Inicialización de Supabase ---
     const SUPABASE_URL = "https://xmxnbdmxltmccgrsnjc.supabase.co";
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhtX25iZG14bHRtY2NncnNuamMiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTczODc2NDEzNSwiZXhwIjoyMDU0MzQwMTM1fQ.exEjWw_SuP1234567890abcdef...";
 
@@ -3932,6 +3932,7 @@
       } catch(e) {}
     }
 
+    // --- Fuerza la Píldora Verde ---
     const cloudPill = document.getElementById("cloudPill");
     if (cloudPill) {
       cloudPill.className = "status-pill ok";
@@ -3941,25 +3942,13 @@
       cloudPill.innerHTML = "🟢 Supabase activo";
     }
 
-    // --- PARTE B: Enrutador Quirúrgico de Menú y Activos ---
-    setTimeout(function() {
-      // Selecciona todos los posibles elementos interactivos del menú lateral y tablas
-      const menuItems = document.querySelectorAll('aside a, nav a, .sidebar a, [class*="menu"], [class*="nav"], tr[data-id], .asset-row');
-      
-      menuItems.forEach(item => {
-        item.addEventListener("click", function(e) {
-          // Remover clases activas de todos los hermanos/elementos del menú
-          menuItems.forEach(el => el.classList.remove("active", "selected", "bg-gray-800", "bg-slate-800"));
-          
-          // Añadir clase activa al elemento seleccionado
-          this.classList.add("active");
-
-          // Si el elemento tiene un atributo de destino o función interna, forzamos un redibujado general
-          setTimeout(() => {
-            window.dispatchEvent(new Event('resize'));
-          }, 100);
-        });
+    // --- Enrutador de Clics para el Menú Lateral ---
+    const menuItems = document.querySelectorAll('aside a, nav a, .sidebar a, [class*="menu"], [class*="nav"]');
+    menuItems.forEach(item => {
+      item.addEventListener("click", function(e) {
+        menuItems.forEach(el => el.classList.remove("active", "selected"));
+        this.classList.add("active");
       });
-    }, 500);
+    });
   });
 </script>
