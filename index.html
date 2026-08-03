@@ -3955,5 +3955,34 @@
   authBootstrap();
 })();
 </script>
+<script>
+(function() {
+  /* ---------- CONFIGURACIÓN SUPABASE ---------- */
+  const SUPABASE_URL = "https://tu-proyecto.supabase.co"; // Coloca tu URL de Supabase aquí
+  const SUPABASE_KEY = "tu-anon-public-key-aqui";        // Coloca tu Key de Supabase aquí
 
-</body></html>
+  // Forzar la creación del cliente en window.supa
+  if (typeof window.supabase !== "undefined" && SUPABASE_URL !== "https://tu-proyecto.supabase.co") {
+    try {
+      window.supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      
+      // Actualizar el estado visual inmediatamente
+      const cloudPill = document.getElementById("cloudPill");
+      if (cloudPill) {
+        cloudPill.className = "status-pill ok";
+        cloudPill.innerHTML = "🟢 Supabase activo";
+      }
+      console.log("Supabase conectado con éxito.");
+    } catch (e) {
+      console.error("Error al conectar Supabase:", e);
+    }
+  }
+
+  /* ---------- INICIALIZACIÓN DE LA APP ---------- */
+  if (typeof authBootstrap === "function") {
+    authBootstrap();
+  }
+})();
+</script>
+</body>
+</html>
