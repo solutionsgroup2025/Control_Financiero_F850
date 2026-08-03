@@ -3916,13 +3916,12 @@
     showToast("Haz clic en cualquier fila de la tabla para ver el detalle y registrar movimientos.");
   });
 
-<!-- 1. Librería oficial de Supabase (Cargada primero y fuera del bloque lógico) -->
+<!-- Librería oficial de Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<!-- 2. Bloque unificado de inicialización, píldora verde y enrutador de menú -->
+<!-- Bloque definitivo de Supabase y Menú -->
 <script>
   document.addEventListener("DOMContentLoaded", function() {
-    // --- Configuración e Inicialización de Supabase ---
     const SUPABASE_URL = "https://xmxnbdmxltmccgrsnjc.supabase.co";
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhtX25iZG14bHRtY2NncnNuamMiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTczODc2NDEzNSwiZXhwIjoyMDU0MzQwMTM1fQ.exEjWw_SuP1234567890abcdef...";
 
@@ -3932,7 +3931,6 @@
       } catch(e) {}
     }
 
-    // --- Fuerza la Píldora Verde ---
     const cloudPill = document.getElementById("cloudPill");
     if (cloudPill) {
       cloudPill.className = "status-pill ok";
@@ -3942,7 +3940,6 @@
       cloudPill.innerHTML = "🟢 Supabase activo";
     }
 
-    // --- Enrutador de Clics para el Menú Lateral ---
     const menuItems = document.querySelectorAll('aside a, nav a, .sidebar a, [class*="menu"], [class*="nav"]');
     menuItems.forEach(item => {
       item.addEventListener("click", function(e) {
