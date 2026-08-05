@@ -3916,13 +3916,12 @@
     showToast("Haz clic en cualquier fila de la tabla para ver el detalle y registrar movimientos.");
   });
 
-<!-- Librería oficial de Supabase -->
+<!-- 1. Librería de Supabase completamente fuera de cualquier bloque -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<!-- Bloque definitivo y universal para forzar la navegación del menú -->
+<!-- 2. Lógica y eventos limpios -->
 <script>
   document.addEventListener("DOMContentLoaded", function() {
-    // --- 1. Supabase y Píldora Verde ---
     const SUPABASE_URL = "https://xmxnbdmxltmccgrsnjc.supabase.co";
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhtX25iZG14bHRtY2NncnNuamMiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTczODc2NDEzNSwiZXhwIjoyMDU0MzQwMTM1fQ.exEjWw_SuP1234567890abcdef...";
 
@@ -3939,30 +3938,13 @@
       cloudPill.innerHTML = "🟢 Supabase activo";
     }
 
-    // --- 2. Forzador de Navegación Universal para el Menú Lateral ---
-    setTimeout(function() {
-      // Seleccionamos absolutamente cualquier elemento interactivo dentro del panel lateral
-      const sidebarElements = document.querySelectorAll('aside *, nav *, .sidebar *, [class*="menu"] *, [class*="nav"] *');
-      
-      sidebarElements.forEach(el => {
-        // Si el elemento parece ser una opción del menú (tiene texto o hijos directos de navegación)
-        if (el.tagName === 'A' || el.tagName === 'BUTTON' || el.classList.contains('menu-item') || el.closest('aside')) {
-          el.style.cursor = 'pointer'; // Asegura que el mouse muestre que es interactivo
-          
-          // Escuchamos el clic y forzamos la propagación y visibilidad
-          el.addEventListener('click', function(e) {
-            // Forzamos clases activas visuales en el contenedor inmediato
-            const parentItem = this.closest('a') || this.closest('div') || this;
-            const siblings = parentItem.parentElement ? parentItem.parentElement.children : [];
-            
-            Array.from(siblings).forEach(sib => sib.classList.remove('active', 'selected', 'bg-gray-800', 'bg-slate-800'));
-            parentItem.classList.add('active');
-
-            // Disparamos un evento global para que el motor interno de la app despierte
-            window.dispatchEvent(new Event('resize'));
-          }, true); // Captura el evento en la fase de captura para asegurar que se ejecute primero
-        }
+    // Activador del menú
+    const menuItems = document.querySelectorAll('aside a, nav a, .sidebar a, [class*="menu"]');
+    menuItems.forEach(item => {
+      item.addEventListener("click", function(e) {
+        menuItems.forEach(el => el.classList.remove("active", "selected"));
+        this.classList.add("active");
       });
-    }, 1000);
+    });
   });
 </script>
