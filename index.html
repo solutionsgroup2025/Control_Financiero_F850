@@ -3,6 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Familia 850 — Panel de Control Financiero</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <style>
   :root{
     --bg:#090b14;
@@ -1138,6 +1139,10 @@
   var supaLastRev = 0;
   var supaPushTimer = null;
   var supaChannel = null;
+  if(window.pdfjsLib){
+    try{ pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js"; }
+    catch(e){}
+  }
   var CAT_ORDER = ["Liquidez","Renta Fija","Renta Variable","Jubilación","Cripto","Distressed"];
   var CAT_COLORS = {
     "Liquidez": "#3b82f6",
@@ -2977,12 +2982,19 @@
     showToast("API key eliminada.");
   });
 
-  function fileToBase64(file){
-    return new Promise(function(resolve, reject){
-      var reader = new FileReader();
-      reader.onload = function(){ resolve(reader.result.split(",")[1]); };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
+  function extractPdfText(file){
+    return file.arrayBuffer().then(function(buf){
+      return pdfjsLib.getDocument({ data: buf }).promise;
+    }).then(function(pdf){
+      var pagePromises = [];
+      for(var i = 1; i <= pdf.numPages; i++){
+        pagePromises.push(pdf.getPage(i).then(function(page){
+          return page.getTextContent().then(function(content){
+            return content.items.map(function(it){ return it.str; }).join(" ");
+          });
+        }));
+      }
+      return Promise.all(pagePromises).then(function(pages){ return pages.join("\n\n"); });
     });
   }
 
@@ -3026,8 +3038,16 @@
     if(ext === "pdf"){
       var key = getApiKey();
       if(!key){ els.importStatus.textContent = "Configura tu API key de Anthropic arriba antes de leer un PDF."; return; }
-      els.importStatus.textContent = "Leyendo " + file.name + " con IA…";
-      fileToBase64(file).then(function(b64){
+      if(!window.pdfjsLib){ els.importStatus.textContent = "No se pudo cargar el lector de PDF — revisa tu conexión a internet e intenta de nuevo."; return; }
+      els.importStatus.textContent = "Extrayendo texto de " + file.name + "…";
+      var pdfPreviewText = "";
+      extractPdfText(file).then(function(text){
+        text = (text||"").trim();
+        if(text.length < 20){
+          throw new Error("Este PDF no parece tener texto legible (podría ser una imagen escaneada). Prueba con un PDF generado digitalmente, o usa CSV/JSON.");
+        }
+        pdfPreviewText = text.length > 12000 ? text.slice(0,12000) : text;
+        els.importStatus.textContent = "Interpretando " + file.name + " con IA…";
         return fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
           headers: {
@@ -3041,10 +3061,7 @@
             max_tokens: 1024,
             messages: [{
               role: "user",
-              content: [
-                { type: "document", source: { type: "base64", media_type: "application/pdf", data: b64 } },
-                { type: "text", text: "Extrae de este estado de cuenta: periodo (formato YYYY-MM), saldo/valor total del periodo, ingresos/cupones/réditos/canon del periodo, y cargos/comisiones del periodo. Responde SOLO con JSON: {\"periodo\":\"YYYY-MM\",\"total\":0,\"ingresos\":0,\"cargos\":0}" }
-              ]
+              content: "Este es el texto extraído de un estado de cuenta financiero:\n\n" + pdfPreviewText + "\n\nExtrae: periodo (formato YYYY-MM), saldo/valor total del periodo, ingresos/cupones/réditos/canon del periodo, y cargos/comisiones del periodo. Responde SOLO con JSON: {\"periodo\":\"YYYY-MM\",\"total\":0,\"ingresos\":0,\"cargos\":0}"
             }]
           })
         });
