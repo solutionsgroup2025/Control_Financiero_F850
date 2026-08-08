@@ -304,7 +304,7 @@
   .comp-track{height:7px;border-radius:999px;background:#1c2740;overflow:hidden;}
   .comp-fill{height:100%;border-radius:999px;}
 </style>
-<script src="chrome-extension://liecbddmkiiihnedobmlmillhodjkdmb/js/recordConsoleEvents.js"></script></head>
+</head>
 <body>
 
 <div id="authPanel" class="auth-screen" style="display:none;">
@@ -1077,8 +1077,8 @@
      URL y la clave podría leer o modificar estos datos financieros. Para uso solo-familiar esto
      suele ser aceptable si el repo/URL se mantienen privados; si no, restringe la política a un
      usuario autenticado (Supabase Auth) en vez de "using (true)". */
-  var SUPABASE_URL = "AQUI_TU_PROJECT_URL";
-  var SUPABASE_KEY = "AQUI_TU_ANON_KEY";
+  var SUPABASE_URL = "https://xmxmnbdmxltmccgrsnjc.supabase.co";
+  var SUPABASE_KEY = "sb_publishable_I6Q5E1VcOnU0sMhwAohxsQ_u6B1JzfK";
   var SUPABASE_ROW_ID = "estado_familiar_v1";
   var SUPABASE_CONFIGURED = SUPABASE_URL.indexOf("AQUI_") !== 0 && SUPABASE_KEY.indexOf("AQUI_") !== 0;
   var supa = null;
@@ -3916,35 +3916,9 @@
     showToast("Haz clic en cualquier fila de la tabla para ver el detalle y registrar movimientos.");
   });
 
-<!-- 1. Librería de Supabase completamente fuera de cualquier bloque -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-<!-- 2. Lógica y eventos limpios -->
-<script>
-  document.addEventListener("DOMContentLoaded", function() {
-    const SUPABASE_URL = "https://xmxnbdmxltmccgrsnjc.supabase.co";
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhtX25iZG14bHRtY2NncnNuamMiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTczODc2NDEzNSwiZXhwIjoyMDU0MzQwMTM1fQ.exEjWw_SuP1234567890abcdef...";
-
-    if (typeof supabase !== "undefined") {
-      try { window.supa = supabase.createClient(SUPABASE_URL, SUPABASE_KEY); } catch(e) {}
-    }
-
-    const cloudPill = document.getElementById("cloudPill");
-    if (cloudPill) {
-      cloudPill.className = "status-pill ok";
-      cloudPill.style.display = "inline-block";
-      cloudPill.style.backgroundColor = "#10b981";
-      cloudPill.style.color = "#ffffff";
-      cloudPill.innerHTML = "🟢 Supabase activo";
-    }
-
-    // Activador del menú
-    const menuItems = document.querySelectorAll('aside a, nav a, .sidebar a, [class*="menu"]');
-    menuItems.forEach(item => {
-      item.addEventListener("click", function(e) {
-        menuItems.forEach(el => el.classList.remove("active", "selected"));
-        this.classList.add("active");
-      });
-    });
-  });
+  /* ---------- init ---------- */
+  authBootstrap();
+})();
 </script>
+</body>
+</html>
