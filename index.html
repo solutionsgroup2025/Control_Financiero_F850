@@ -540,7 +540,7 @@
         <div class="table-card" style="padding:20px 22px;">
           <div class="tab-bar" id="swlTabs">
             <button class="tab-btn on" data-tab="bonos">Bonos</button>
-            <button class="tab-btn" data-tab="flujo">Flujo 12 Meses</button>
+            <button class="tab-btn" data-tab="flujo">Proyección Próximos 12 Meses</button>
             <button class="tab-btn" data-tab="historial">Historial</button>
           </div>
 
@@ -557,6 +557,7 @@
           </div>
 
           <div class="tab-panel" data-panel="historial" id="swlPanelHistorial">
+            <div class="month-bar" id="swlHistYearSelector" style="margin-bottom:12px;"></div>
             <div class="matrix-wrap">
               <table class="matrix" id="swlHistorialTable" style="font-size:12.5px;"></table>
             </div>
@@ -1193,6 +1194,7 @@
     swlBonosTable: document.getElementById("swlBonosTable"),
     swlFlujoTable: document.getElementById("swlFlujoTable"),
     swlHistorialTable: document.getElementById("swlHistorialTable"),
+    swlHistYearSelector: document.getElementById("swlHistYearSelector"),
     swpMonths: document.getElementById("swpMonths"),
     swpKpis: document.getElementById("swpKpis"),
     swpComposicion: document.getElementById("swpComposicion"),
@@ -2468,14 +2470,31 @@
     els.swlFlujoTable.innerHTML = head + rows + totCupRow + totCapRow + totFlujoRow;
   }
 
+  var swlHistYear = null;
+
   function buildSwlHistorialTab(hist){
+    var years = Array.from(new Set(hist.map(function(h){ return h.per.slice(0,4); }))).sort(function(a,b){ return b.localeCompare(a); });
+    if(!years.length) years = [String(new Date().getFullYear())];
+    if(!swlHistYear || years.indexOf(swlHistYear) === -1) swlHistYear = years[0];
+
+    els.swlHistYearSelector.innerHTML = years.map(function(y){
+      return '<button class="month-btn' + (y===swlHistYear?' on':'') + '" data-year="' + y + '">' + y + '</button>';
+    }).join("");
+    els.swlHistYearSelector.querySelectorAll(".month-btn").forEach(function(btn){
+      btn.addEventListener("click", function(){ swlHistYear = btn.getAttribute("data-year"); buildSwlHistorialTab(hist); });
+    });
+
+    var filtered = hist.filter(function(h){ return h.per.slice(0,4) === swlHistYear; });
     var head = "<tr><th style='text-align:left'>Periodo</th><th>Total</th><th>Ingresos</th><th>Cargos</th></tr>";
-    var rows = hist.slice().sort(function(a,b){ return a.per<b.per?1:-1; }).map(function(h){
+    var rows = filtered.slice().sort(function(a,b){ return a.per<b.per?1:-1; }).map(function(h){
       return "<tr><td>" + escapeHtml(h.per) + "</td><td>" + fmtMoney(h.total) + "</td>" +
         "<td style='color:var(--emerald)'>" + (h.ing>0?fmtMoney(h.ing):"—") + "</td>" +
         "<td style='color:" + (h.car>0?"var(--red)":"var(--text-dim)") + "'>" + (h.car>0?fmtMoney(h.car):"—") + "</td></tr>";
     }).join("");
-    els.swlHistorialTable.innerHTML = head + rows;
+    var totIng = filtered.reduce(function(s,h){ return s+(h.ing||0); },0);
+    var totCar = filtered.reduce(function(s,h){ return s+(h.car||0); },0);
+    var totRow = "<tr class='matrix-total'><td>TOTAL " + escapeHtml(swlHistYear) + "</td><td></td><td style='color:var(--emerald)'>" + fmtMoney(totIng) + "</td><td style='color:var(--red)'>" + fmtMoney(totCar) + "</td></tr>";
+    els.swlHistorialTable.innerHTML = head + (rows || "<tr><td colspan='4' style='text-align:center;color:var(--text-dim);padding:18px;'>Sin registros para " + escapeHtml(swlHistYear) + ".</td></tr>") + totRow;
   }
 
   /* ---------- Sweetwater Pershing (multi-activo internacional) ---------- */
