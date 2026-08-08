@@ -422,6 +422,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1Z"></path></svg>
         Configuración
       </button>
+      <button class="nav-item" data-nav="users">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Usuarios y Actividad
+      </button>
     </div>
 
     <div class="sidebar-footer">
@@ -724,6 +728,27 @@
           <h3 style="margin:0 0 4px;">Cargas Recientes Aplicadas</h3>
           <p class="sub" style="margin:0 0 14px;">Registro de auditoría — cada carga queda aquí, nunca se borra.</p>
           <div id="ingestLog"></div>
+        </div>
+      </div>
+
+      <div class="page" id="page-users">
+        <div class="module-note" id="usersNote">Cargando…</div>
+
+        <div class="table-card" style="padding:20px 22px;margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px;">
+            <div>
+              <h3 style="margin:0 0 4px;">Usuarios con Acceso</h3>
+              <p class="sub" style="margin:0;">Quién puede entrar al tablero. Solo un administrador puede agregar o quitar acceso.</p>
+            </div>
+            <button class="btn btn-primary" id="btnAddUser" style="display:none;">+ Dar de Alta Usuario</button>
+          </div>
+          <div class="matrix-wrap"><table class="matrix" id="usersTable" style="font-size:12.5px;"></table></div>
+        </div>
+
+        <div class="table-card" style="padding:20px 22px;">
+          <h3 style="margin:0 0 4px;">Bitácora de Actividad</h3>
+          <p class="sub" style="margin:0 0 14px;">Quién guardó cambios y cuándo — últimos 100 registros.</p>
+          <div class="matrix-wrap"><table class="matrix" id="activityLogTable" style="font-size:12.5px;"></table></div>
         </div>
       </div>
 
@@ -1117,6 +1142,7 @@
     "dividend-plan": { title:"Proyección y Distribución de Dividendos", sub:"Planificación y ejecución de la distribución familiar de dividendos" },
     "cripto": { title:"Cripto", sub:"Spot · Precios en tiempo real vía Binance" },
     "config": { title:"Configuración", sub:"API key de IA e importador de estados de cuenta" },
+    "users": { title:"Usuarios y Actividad", sub:"Quién tiene acceso al tablero y quién ha hecho cambios" },
     "hipotecas": { title:"Hipotecas", sub:"Deuda documentada de la familia" },
     "tesoreria": { title:"Tesorería Manual", sub:"Libro diario de cuentas de gestión manual — notas y movimientos" },
     "notas": { title:"Notas Familiares", sub:"Seguimiento y pendientes por cuenta" },
@@ -1283,6 +1309,10 @@
     authPassword: document.getElementById("authPassword"),
     authError: document.getElementById("authError"),
     authSubmit: document.getElementById("authSubmit"),
+    usersNote: document.getElementById("usersNote"),
+    usersTable: document.getElementById("usersTable"),
+    btnAddUser: document.getElementById("btnAddUser"),
+    activityLogTable: document.getElementById("activityLogTable"),
     overlay: document.getElementById("overlay"),
     btnClose: document.getElementById("btnClose"),
     modalTitle: document.getElementById("modalTitle"),
@@ -1386,11 +1416,118 @@
     }).then(function(res){
       if(res.error) throw res.error;
       updateCloudPill("ok", "🟢 Sincronizado en la Nube");
+      logActivity("Guardó cambios en: " + (PAGE_META[currentPage] ? PAGE_META[currentPage].title : currentPage));
     }).catch(function(err){
       updateCloudPill("cloud-error", "🔴 Error al sincronizar (revisa tu conexión)");
       console.error("Supabase save error:", err);
     });
   }
+
+  function logActivity(action){
+    if(!supa || !currentUser) return;
+    supa.from("activity_log").insert({ user_email: currentUser.email, action: action })
+      .then(function(){})
+      .catch(function(err){ console.error("Activity log error:", err); });
+  }
+
+  /* ---------- Usuarios y Actividad ---------- */
+  function renderUsersActivity(){
+    if(!supa){
+      els.usersNote.textContent = "Supabase no está configurado — la gestión de usuarios solo funciona en el tablero publicado en la nube.";
+      els.usersTable.innerHTML = "";
+      els.activityLogTable.innerHTML = "";
+      els.btnAddUser.style.display = "none";
+      return;
+    }
+    els.usersNote.textContent = currentUserIsAdmin
+      ? "Eres administrador — puedes dar de alta o quitar acceso. Dar de alta aquí solo autoriza el correo; la persona necesita además una cuenta creada en Supabase (Authentication → Users) con ese mismo correo para poder iniciar sesión."
+      : "Solo un administrador puede agregar o quitar usuarios. Aquí puedes ver la bitácora de actividad.";
+    els.btnAddUser.style.display = currentUserIsAdmin ? "inline-flex" : "none";
+
+    supa.from("allowed_users").select("email,nombre,is_admin,added_at").order("added_at", { ascending: true })
+      .then(function(res){
+        if(res.error) throw res.error;
+        buildUsersTable(res.data || []);
+      })
+      .catch(function(err){
+        els.usersTable.innerHTML = "<tr><td style='text-align:center;color:var(--text-dim);padding:18px;'>No se pudo cargar la lista de usuarios.</td></tr>";
+        console.error("allowed_users load error:", err);
+      });
+
+    supa.from("activity_log").select("user_email,action,created_at").order("created_at", { ascending: false }).limit(100)
+      .then(function(res){
+        if(res.error) throw res.error;
+        buildActivityLogTable(res.data || []);
+      })
+      .catch(function(err){
+        els.activityLogTable.innerHTML = "<tr><td style='text-align:center;color:var(--text-dim);padding:18px;'>No se pudo cargar la bitácora.</td></tr>";
+        console.error("activity_log load error:", err);
+      });
+  }
+
+  function buildUsersTable(users){
+    var head = "<tr><th style='text-align:left'>Correo</th><th style='text-align:left'>Nombre</th><th>Rol</th><th style='text-align:left'>Desde</th><th></th></tr>";
+    var rows = users.map(function(u){
+      var isSelf = currentUser && u.email === currentUser.email;
+      var delBtn = (currentUserIsAdmin && !isSelf)
+        ? "<button type='button' class='btn btn-secondary users-del' data-email=\"" + escapeHtml(u.email) + "\" style='padding:4px 9px;font-size:11px;color:var(--red);'>Quitar acceso</button>"
+        : "";
+      return "<tr>" +
+        "<td style='text-align:left;font-weight:700;color:var(--text)'>" + escapeHtml(u.email) + (isSelf?" <span style='color:var(--text-dim);font-weight:400;'>(tú)</span>":"") + "</td>" +
+        "<td style='text-align:left;color:var(--text-muted)'>" + escapeHtml(u.nombre||"—") + "</td>" +
+        "<td>" + (u.is_admin ? "<span class='pill' style='background:" + hexToRgba("#8b5cf6",0.15) + ";color:var(--violet);'>Administrador</span>" : "<span class='pill' style='background:" + hexToRgba("#3b82f6",0.15) + ";color:var(--blue);'>Miembro</span>") + "</td>" +
+        "<td style='text-align:left;color:var(--text-muted)'>" + fmtDate((u.added_at||"").slice(0,10)) + "</td>" +
+        "<td>" + delBtn + "</td>" +
+      "</tr>";
+    }).join("");
+    els.usersTable.innerHTML = head + (rows || "<tr><td colspan='5' style='text-align:center;color:var(--text-dim);padding:18px;'>Sin usuarios registrados.</td></tr>");
+    els.usersTable.querySelectorAll(".users-del").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        var email = btn.getAttribute("data-email");
+        if(!confirm("¿Quitar el acceso de " + email + "? Ya no podrá entrar al tablero.")) return;
+        supa.from("allowed_users").delete().eq("email", email)
+          .then(function(res){
+            if(res.error) throw res.error;
+            showToast("Acceso de " + email + " revocado.");
+            logActivity("Quitó el acceso de " + email);
+            renderUsersActivity();
+          })
+          .catch(function(err){
+            showToast("No se pudo quitar el acceso: " + (err.message||"error desconocido"));
+          });
+      });
+    });
+  }
+
+  function buildActivityLogTable(rows){
+    var head = "<tr><th style='text-align:left'>Fecha</th><th style='text-align:left'>Usuario</th><th style='text-align:left'>Acción</th></tr>";
+    var body = rows.map(function(r){
+      var d = new Date(r.created_at);
+      var fecha = isNaN(d.getTime()) ? r.created_at : d.toLocaleString("es-PA",{year:"numeric",month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"});
+      return "<tr><td style='text-align:left;color:var(--text-muted)'>" + escapeHtml(fecha) + "</td>" +
+        "<td style='text-align:left;font-weight:600'>" + escapeHtml(r.user_email) + "</td>" +
+        "<td style='text-align:left;color:var(--text-muted)'>" + escapeHtml(r.action) + "</td></tr>";
+    }).join("");
+    els.activityLogTable.innerHTML = head + (body || "<tr><td colspan='3' style='text-align:center;color:var(--text-dim);padding:18px;'>Sin actividad registrada todavía.</td></tr>");
+  }
+
+  els.btnAddUser.addEventListener("click", function(){
+    if(!currentUserIsAdmin) return;
+    var email = prompt("Correo del nuevo usuario (debe coincidir exactamente con la cuenta que le crees en Supabase Authentication):");
+    if(!email || !email.trim()) return;
+    email = email.trim().toLowerCase();
+    var nombre = prompt("Nombre para mostrar (opcional):") || "";
+    supa.from("allowed_users").insert({ email: email, nombre: nombre.trim(), is_admin: false })
+      .then(function(res){
+        if(res.error) throw res.error;
+        showToast("Correo " + email + " dado de alta. Recuerda crearle su cuenta en Supabase → Authentication → Users.");
+        logActivity("Dio de alta a " + email);
+        renderUsersActivity();
+      })
+      .catch(function(err){
+        showToast("No se pudo agregar: " + (err.message||"ya existe o falta permiso de administrador"));
+      });
+  });
 
   function supaPushDebounced(){
     if(!supa) return;
@@ -1423,6 +1560,7 @@
 
   /* ---------- Auth (acceso restringido a la familia — solo activo si Supabase está configurado) ---------- */
   var currentUser = null;
+  var currentUserIsAdmin = false;
 
   function showAuthScreen(){
     els.appRoot.style.display = "none";
@@ -1438,6 +1576,14 @@
     hideAuthScreen();
     els.btnLogout.style.display = "inline-flex";
     els.footerUserLabel.textContent = (currentUser && currentUser.email) || "Familia López / Ho";
+    if(supa && currentUser){
+      supa.from("allowed_users").select("is_admin").eq("email", currentUser.email).maybeSingle()
+        .then(function(res){
+          currentUserIsAdmin = !!(res.data && res.data.is_admin);
+          if(currentPage === "users") renderUsersActivity();
+        })
+        .catch(function(){ currentUserIsAdmin = false; });
+    }
     if(!backup) initialLoad();
   }
 
@@ -3746,7 +3892,7 @@
   });
 
   /* ---------- page router ---------- */
-  var IMPLEMENTED_PAGES = ["resumen","jubilacion","sw-local","sw-pershing","rl360","fortesza","inmuebles","solution-group","dividend-plan","cripto","config","hipotecas","notas","module-admin","tesoreria"];
+  var IMPLEMENTED_PAGES = ["resumen","jubilacion","sw-local","sw-pershing","rl360","fortesza","inmuebles","solution-group","dividend-plan","cripto","config","users","hipotecas","notas","module-admin","tesoreria"];
   function goPage(id){
     var isCustom = id.indexOf("custom:") === 0;
     if(!isCustom && IMPLEMENTED_PAGES.indexOf(id) === -1) return;
@@ -3778,6 +3924,7 @@
       else if(id === "dividend-plan") renderDividendPlan();
       else if(id === "cripto") renderCripto();
       else if(id === "config") renderConfig();
+      else if(id === "users") renderUsersActivity();
       else if(id === "hipotecas") renderHipotecas();
       else if(id === "tesoreria") renderTesoreria();
       else if(id === "notas") renderNotas();
