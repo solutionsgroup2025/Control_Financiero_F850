@@ -716,12 +716,14 @@
             <div class="form-grid" id="ivPershingFields" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border-soft);">
               <div class="form-field full" style="margin-bottom:-4px;"><label style="color:var(--text-dim);">Composición por clase de activo (opcional — deja en blanco lo que no cambió)</label></div>
               <div class="form-field"><label>Saldo Anterior</label><input type="number" step="0.01" id="ivSaldoAnterior" placeholder="0.00"></div>
+              <div class="form-field"><label>Depósitos / Aportes del mes</label><input type="number" step="0.01" id="ivPershingDepositos" placeholder="0.00"></div>
               <div class="form-field"><label>Efectivo / MM</label><input type="number" step="0.01" id="ivEfectivo" placeholder="0.00"></div>
               <div class="form-field"><label>Renta Fija / Bonos</label><input type="number" step="0.01" id="ivRentaFija" placeholder="0.00"></div>
               <div class="form-field"><label>Fondos Mutuos</label><input type="number" step="0.01" id="ivFondosMutuos" placeholder="0.00"></div>
               <div class="form-field"><label>ETFs</label><input type="number" step="0.01" id="ivEtfs" placeholder="0.00"></div>
               <div class="form-field"><label>Alternativos</label><input type="number" step="0.01" id="ivAlternativos" placeholder="0.00"></div>
               <div class="form-field full" id="ivPershingPosSummary" style="color:var(--text-muted);font-size:12.5px;"></div>
+              <div class="form-field full" id="ivPershingCashDetail"></div>
             </div>
             <div class="form-grid" style="margin-top:12px;">
               <div class="form-field full">
@@ -1275,6 +1277,8 @@
     ivEtfs: document.getElementById("ivEtfs"),
     ivAlternativos: document.getElementById("ivAlternativos"),
     ivPershingPosSummary: document.getElementById("ivPershingPosSummary"),
+    ivPershingDepositos: document.getElementById("ivPershingDepositos"),
+    ivPershingCashDetail: document.getElementById("ivPershingCashDetail"),
     btnApplyIngest: document.getElementById("btnApplyIngest"),
     ingestLog: document.getElementById("ingestLog"),
     tesYearSelector: document.getElementById("tesYearSelector"),
@@ -2536,30 +2540,79 @@
   var swpConsYear = null;
   var SWP_CONS_MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 
-  function renderPershingConsolidado(){
+  var SWP_MES_NUM_TO_NOMBRE = {"01":"Ene","02":"Feb","03":"Mar","04":"Abr","05":"May","06":"Jun","07":"Jul","08":"Ago","09":"Sep","10":"Oct","11":"Nov","12":"Dic"};
+
+  function buildConsolidatedYears(){
     var cons = backup.state.pershingConsolidado;
-    if(!cons || !cons.years || !Object.keys(cons.years).length){
+    var years = {};
+    if(cons && cons.years){
+      Object.keys(cons.years).forEach(function(y){ years[y] = cons.years[y]; });
+    }
+    var hist = backup.state.pershingHistorial || {};
+    var byYear = {};
+    Object.keys(hist).sort().forEach(function(per){
+      var y = per.slice(0,4);
+      if(years[y]) return; // ese año ya viene del extracto Pershing-2026.xlsx — no se pisa
+      if(!byYear[y]) byYear[y] = [];
+      byYear[y].push(per);
+    });
+    Object.keys(byYear).forEach(function(y){
+      var meses = {};
+      var sumDiv=0, sumCar=0, sumChg=0, sumGP=0, sumDep=0, sumRendPct=0, rendCount=0;
+      byYear[y].forEach(function(per){
+        var d = hist[per];
+        var mesName = SWP_MES_NUM_TO_NOMBRE[per.slice(5,7)];
+        if(!mesName) return;
+        var div = d.ing||0;
+        var car = -(d.car||0); // se niega para usar la misma convención de signo que el extracto Pershing-2026.xlsx
+        var chg = d.cambioNeto||0;
+        var dep = d.depositos||0;
+        var gp = div + car + chg;
+        var rendPct = d.inicial ? (gp/d.inicial) : null;
+        meses[mesName] = { saldo: d.total, depositos: dep||null, dividendos: div, cargos: car, cambioNeto: chg, gananciaPerdida: gp, rendimientoPct: rendPct };
+        sumDiv+=div; sumCar+=car; sumChg+=chg; sumGP+=gp; sumDep+=dep;
+        if(rendPct != null){ sumRendPct += rendPct; rendCount++; }
+      });
+      years[y] = {
+        meses: meses,
+        resumen: {
+          depositos: sumDep || null, dividendos: round2(sumDiv), cargos: round2(sumCar),
+          cambioNeto: round2(sumChg), gananciaPerdida: round2(sumGP),
+          rendimientoPctSuma: rendCount ? round2(sumRendPct) : null,
+          derivadoDeHistorial: true
+        }
+      };
+    });
+    return years;
+  }
+  function round2(n){ return Math.round((n||0)*100)/100; }
+
+  function renderPershingConsolidado(){
+    var yearsMap = buildConsolidatedYears();
+    if(!Object.keys(yearsMap).length){
       els.swpConsNote.textContent = "";
       els.swpConsAnualTable.innerHTML = "";
       els.swpConsYearSelector.innerHTML = "";
       els.swpConsMesesTable.innerHTML = "";
       return;
     }
-    els.swpConsNote.textContent = "Extracto real de la cuenta Pershing (" + (cons.fuente||"") + "). \"Saldo\" es el valor tal como aparece en el estado de cuenta mensual de origen — algunos meses reflejan el saldo de apertura del mes.";
+    var cons = backup.state.pershingConsolidado;
+    els.swpConsNote.textContent = "Extracto real de la cuenta Pershing (" + (cons&&cons.fuente||"") + " + historial mensual cargado). \"Saldo\" es el valor tal como aparece en el estado de cuenta mensual de origen — algunos meses reflejan el saldo de apertura del mes. Los años marcados con * se calculan a partir del historial mensual cargado por el motor de ingesta (no tienen \"Depósitos\" separados salvo que se hayan registrado explícitamente).";
 
-    var years = Object.keys(cons.years).sort();
+    var years = Object.keys(yearsMap).sort();
     var head = "<tr><th style='text-align:left'>Año</th><th>Depósitos</th><th>Dividendos</th><th>Cargos</th><th>Cambio de Mercado</th><th>Ganancia/Pérdida Neta</th><th>Rendimiento</th></tr>";
     var rows = years.map(function(y){
-      var r = cons.years[y].resumen;
-      var rpVal = r.rendimientoPctSuma || 0;
-      var rp = (rpVal*100).toFixed(1) + "%";
-      return "<tr><td style='text-align:left;font-weight:700;color:var(--text)'>" + escapeHtml(y) + "</td>" +
-        "<td>" + fmtMoney(r.depositos) + "</td>" +
+      var r = yearsMap[y].resumen;
+      var rpVal = r.rendimientoPctSuma;
+      var rp = rpVal != null ? (rpVal*100).toFixed(1) + "%" : "—";
+      var yLabel = escapeHtml(y) + (r.derivadoDeHistorial ? " *" : "");
+      return "<tr><td style='text-align:left;font-weight:700;color:var(--text)'>" + yLabel + "</td>" +
+        "<td>" + (r.depositos!=null?fmtMoney(r.depositos):"—") + "</td>" +
         "<td style='color:var(--emerald)'>" + fmtMoney(r.dividendos) + "</td>" +
         "<td style='color:var(--red)'>" + fmtMoney(r.cargos) + "</td>" +
         "<td style='color:" + ((r.cambioNeto||0)>=0?"var(--emerald)":"var(--red)") + "'>" + ((r.cambioNeto||0)>=0?"+":"") + fmtMoney(r.cambioNeto) + "</td>" +
         "<td style='font-weight:700;color:" + ((r.gananciaPerdida||0)>=0?"var(--emerald)":"var(--red)") + "'>" + ((r.gananciaPerdida||0)>=0?"+":"") + fmtMoney(r.gananciaPerdida) + "</td>" +
-        "<td style='font-weight:700;color:" + (rpVal>=0?"var(--emerald)":"var(--red)") + "'>" + rp + "</td></tr>";
+        "<td style='font-weight:700;color:" + (rpVal==null?"var(--text-dim)":(rpVal>=0?"var(--emerald)":"var(--red)")) + "'>" + rp + "</td></tr>";
     }).join("");
     els.swpConsAnualTable.innerHTML = head + rows;
 
@@ -2571,7 +2624,7 @@
       btn.addEventListener("click", function(){ swpConsYear = btn.getAttribute("data-year"); renderPershingConsolidado(); });
     });
 
-    buildSwpConsMesesTable(cons.years[swpConsYear].meses || {});
+    buildSwpConsMesesTable(yearsMap[swpConsYear].meses || {});
   }
 
   function buildSwpConsMesesTable(meses){
@@ -2641,11 +2694,32 @@
       compHtml += '<div class="sr"><span class="lbl">Valor periodo anterior (' + escapeHtml(prevPer) + ')</span><span class="val">' + fmtMoney(prevD.total) + '</span></div>' +
         '<div class="sr"><span class="lbl">Variación</span><span class="val" style="color:' + (chg>=0?'var(--emerald)':'var(--red)') + '">' + (chg>=0?'+':'') + fmtMoney(chg) + ' (' + (prevD.total? (chg/prevD.total*100).toFixed(1):"0.0") + '%)</span></div>';
     }
+    if(d.depositos){
+      compHtml += '<div class="sr"><span class="lbl">Depósitos / aportes del periodo</span><span class="val" style="color:var(--blue)">' + fmtMoney(d.depositos) + '</span></div>';
+    }
     compHtml += '<div class="sr"><span class="lbl">Ingresos brutos del periodo</span><span class="val" style="color:var(--emerald)">' + fmtMoney(d.ing) + '</span></div>' +
       '<div class="sr"><span class="lbl">Cargos del periodo</span><span class="val" style="color:var(--red)">' + fmtMoney(d.car) + '</span></div>';
     var valorInicial = d.inicial != null ? d.inicial : (prevD ? prevD.total : 0);
-    compHtml += '<div class="sr" style="border-top:1px solid var(--border);margin-top:6px;padding-top:12px;font-size:11.5px;color:var(--text-dim);">' +
-      '<span>Resumen: ' + fmtMoney(valorInicial) + ' inicial + ' + fmtMoney(d.ing) + ' ingresos − ' + fmtMoney(d.car) + ' cargos ' + (chg>=0?'+':'−') + ' ' + fmtMoney(Math.abs(chg)) + ' cambio mercado = ' + fmtMoney(d.total) + ' final</span></div>';
+    var resumenLine = 'Resumen: ' + fmtMoney(valorInicial) + ' inicial';
+    if(d.depositos) resumenLine += ' + ' + fmtMoney(d.depositos) + ' depósitos';
+    resumenLine += ' + ' + fmtMoney(d.ing) + ' ingresos − ' + fmtMoney(d.car) + ' cargos ' + (chg>=0?'+':'−') + ' ' + fmtMoney(Math.abs(chg)) + ' cambio mercado = ' + fmtMoney(d.total) + ' final';
+    compHtml += '<div class="sr" style="border-top:1px solid var(--border);margin-top:6px;padding-top:12px;font-size:11.5px;color:var(--text-dim);"><span>' + resumenLine + '</span></div>';
+
+    if(d.ingresosDetalle || d.cargosDetalle){
+      var detLines = [];
+      if(d.ingresosDetalle){
+        Object.keys(SWP_INGRESO_LABELS).forEach(function(k){ if(d.ingresosDetalle[k]) detLines.push('<div class="sr"><span class="lbl" style="padding-left:10px;">↳ ' + SWP_INGRESO_LABELS[k] + '</span><span class="val" style="color:var(--emerald);font-size:12px;">+' + fmtMoney(d.ingresosDetalle[k]) + '</span></div>'); });
+      }
+      if(d.cargosDetalle){
+        Object.keys(SWP_CARGO_LABELS).forEach(function(k){ if(d.cargosDetalle[k]) detLines.push('<div class="sr"><span class="lbl" style="padding-left:10px;">↳ ' + SWP_CARGO_LABELS[k] + '</span><span class="val" style="color:var(--red);font-size:12px;">−' + fmtMoney(d.cargosDetalle[k]) + '</span></div>'); });
+      }
+      if(d.interesDevengadoRentaFija){
+        detLines.push('<div class="sr"><span class="lbl" style="padding-left:10px;">↳ Interés devengado en bonos (no es efectivo)</span><span class="val" style="color:var(--amber);font-size:12px;">' + fmtMoney(d.interesDevengadoRentaFija) + '</span></div>');
+      }
+      if(detLines.length){
+        compHtml += '<div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);"><div style="font-size:11px;color:var(--text-dim);font-weight:700;margin-bottom:4px;">DESGLOSE POR FUENTE / TIPO</div>' + detLines.join("") + '</div>';
+      }
+    }
     els.swpComparacion.innerHTML = compHtml;
 
     renderSwpPosiciones(per);
@@ -3139,6 +3213,9 @@
   }
 
   var pendingPershingPositions = null;
+  var pendingPershingCashDetail = null;
+  var SWP_INGRESO_LABELS = { efectivoMM:"Dividendos / Intereses (efectivo MM)", distribucionesAlternativos:"Distribuciones de alternativos (BlackRock, etc.)", otros:"Otros ingresos" };
+  var SWP_CARGO_LABELS = { comisionProductoEspecial:"Comisión producto especial", custodiaExtranjera:"Custodia extranjera", cuentaNoUS:"Cuenta no-US", asesoriaGestion:"Asesoría / gestión de activos", otros:"Otros cargos" };
 
   function prefillReviewForm(obj){
     if(!obj) return;
@@ -3146,6 +3223,7 @@
     if(obj.total != null) els.ivValorTotal.value = obj.total;
     if(obj.ingresos != null) els.ivIngresos.value = obj.ingresos;
     if(obj.cargos != null) els.ivCargos.value = obj.cargos;
+    if(obj.depositos != null && els.ivPershingDepositos) els.ivPershingDepositos.value = obj.depositos;
     if(obj.composicion){
       if(obj.composicion.efectivo != null) els.ivEfectivo.value = obj.composicion.efectivo;
       if(obj.composicion.bonos != null) els.ivRentaFija.value = obj.composicion.bonos;
@@ -3167,6 +3245,22 @@
           : "No se detectó tabla de posiciones en este documento (se aplicarán solo los totales).";
       } else {
         els.ivPershingPosSummary.textContent = "";
+      }
+    }
+
+    pendingPershingCashDetail = (obj.ingresosDetalle || obj.cargosDetalle) ? { ingresosDetalle: obj.ingresosDetalle||{}, cargosDetalle: obj.cargosDetalle||{}, interesDevengadoRentaFija: obj.interesDevengadoRentaFija } : null;
+    if(els.ivPershingCashDetail){
+      if(pendingPershingCashDetail){
+        var ing = pendingPershingCashDetail.ingresosDetalle, car = pendingPershingCashDetail.cargosDetalle;
+        var lines = [];
+        Object.keys(SWP_INGRESO_LABELS).forEach(function(k){ if(ing[k]) lines.push("<span style='color:var(--emerald)'>+" + fmtMoney(ing[k]) + "</span> " + SWP_INGRESO_LABELS[k]); });
+        Object.keys(SWP_CARGO_LABELS).forEach(function(k){ if(car[k]) lines.push("<span style='color:var(--red)'>−" + fmtMoney(car[k]) + "</span> " + SWP_CARGO_LABELS[k]); });
+        if(pendingPershingCashDetail.interesDevengadoRentaFija) lines.push("<span style='color:var(--amber)'>" + fmtMoney(pendingPershingCashDetail.interesDevengadoRentaFija) + "</span> interés devengado en bonos (no es efectivo recibido — solo informativo)");
+        els.ivPershingCashDetail.innerHTML = lines.length
+          ? "<div style='color:var(--text-dim);font-size:11.5px;margin-bottom:4px;'>Desglose detectado por fuente/tipo:</div><div style='font-size:12.5px;line-height:1.9;'>" + lines.join("<br>") + "</div>"
+          : "";
+      } else {
+        els.ivPershingCashDetail.innerHTML = "";
       }
     }
   }
@@ -3219,15 +3313,21 @@
             "\n\nExtrae TODO lo siguiente:\n" +
             "1. periodo (formato YYYY-MM, el mes del corte del estado de cuenta)\n" +
             "2. total: valor total de la cuenta al final del periodo\n" +
-            "3. ingresos: ingresos brutos del periodo (dividendos, intereses, etc.)\n" +
-            "4. cargos: cargos/comisiones del periodo\n" +
-            "5. composicion (opcional, si el documento lo muestra por clase de activo): {\"efectivo\":0,\"bonos\":0,\"fondos\":0,\"etf\":0,\"alternativos\":0}\n" +
-            "6. posiciones: el detalle línea por línea de CADA posición individual que encuentres:\n" +
+            "3. ingresos: ingresos brutos EN EFECTIVO del periodo (dividendos + intereses de efectivo/money market + distribuciones recibidas — NO incluyas interés devengado no pagado)\n" +
+            "4. cargos: total de cargos/comisiones/tarifas del periodo\n" +
+            "5. depositos: depósitos o aportes NUEVOS de efectivo hechos a la cuenta en el periodo (busca transferencias/ACH/wire entrantes; si no hay, usa 0)\n" +
+            "6. composicion (opcional, si el documento lo muestra por clase de activo): {\"efectivo\":0,\"bonos\":0,\"fondos\":0,\"etf\":0,\"alternativos\":0}\n" +
+            "7. ingresosDetalle: desglose de EXACTAMENTE de dónde viene el efectivo recibido (la suma de estos campos debe ser igual a \"ingresos\"):\n" +
+            "   {\"efectivoMM\":0 (dividendos/intereses del fondo de liquidez o money market), \"distribucionesAlternativos\":0 (distribuciones de BlackRock u otras inversiones alternativas/partnership), \"otros\":0}\n" +
+            "8. cargosDetalle: desglose de EXACTAMENTE cada cargo individual que aparezca en el estado de cuenta (la suma debe ser igual a \"cargos\"), usa estas categorías si aplican y agrega lo que no encaje en \"otros\":\n" +
+            "   {\"comisionProductoEspecial\":0 (special product fee / custodia de inversión alternativa no registrada), \"custodiaExtranjera\":0 (foreign custody fee), \"cuentaNoUS\":0 (non-U.S. account fee), \"asesoriaGestion\":0 (asset based fee / advisory fee), \"otros\":0}\n" +
+            "9. interesDevengadoRentaFija: interés ACUMULADO/DEVENGADO (no pagado en efectivo todavía) de los bonos en cartera, si el documento lo muestra como una cifra separada (esto es informativo, NO se suma a \"ingresos\")\n" +
+            "10. posiciones: el detalle línea por línea de CADA posición individual que encuentres:\n" +
             "   - fondosMutuos: [{\"fondo\":\"nombre\",\"cantidad\":0,\"costoUnit\":0,\"baseCosto\":0,\"precioMkt\":0,\"valorMkt\":0,\"gpNoReal\":0}]\n" +
             "   - bonosCorp: [{\"instrumento\":\"nombre\",\"cantidad\":0,\"costoUnit\":0,\"baseCosto\":0,\"precioMkt\":0,\"valorMkt\":0,\"gpNoReal\":0,\"interesDevengado\":0,\"vencimiento\":\"YYYY-MM-DD\",\"cusip\":\"...\"}]\n" +
             "   - etfs: [{\"etf\":\"nombre\",\"acciones\":0,\"costoUnit\":0,\"baseCosto\":0,\"precioMkt\":0,\"valorMkt\":0,\"gpNoReal\":0,\"identificador\":\"...\"}]\n" +
             "   - blackrock: {\"valorActual\":0,\"precioAccion\":0,\"acciones\":0,\"distribucionMensual\":0,\"gpNoReal\":0} (si aparece esta posición específica)\n" +
-            "IMPORTANTE: si alguna sección no aparece en el documento, omítela o déjala como arreglo vacío — NO inventes posiciones ni cifras. Responde SOLO con el JSON, sin texto adicional."
+            "IMPORTANTE: si alguna sección no aparece en el documento, omítela o déjala como arreglo/objeto vacío — NO inventes posiciones, cargos ni cifras que no estén literalmente en el texto. Responde SOLO con el JSON, sin texto adicional."
           : "Este es el texto extraído de un estado de cuenta financiero:\n\n" + pdfPreviewText + "\n\nExtrae: periodo (formato YYYY-MM), saldo/valor total del periodo, ingresos/cupones/réditos/canon del periodo, y cargos/comisiones del periodo. Responde SOLO con JSON: {\"periodo\":\"YYYY-MM\",\"total\":0,\"ingresos\":0,\"cargos\":0}";
         return fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
@@ -3320,11 +3420,14 @@
     else if(t.kind === "pershing"){
       var ph = backup.state.pershingHistorial || (backup.state.pershingHistorial = {});
       var periods = Object.keys(ph).sort();
-      var prev = periods.length ? ph[periods[periods.length-1]] : null;
+      // "anterior" = el período inmediatamente previo a "per", nunca "per" mismo (importante al reaplicar/editar un mes que ya existe)
+      var priorPeriods = periods.filter(function(p){ return p < per; });
+      var prev = priorPeriods.length ? ph[priorPeriods[priorPeriods.length-1]] : null;
       var saldoAnteriorInput = els.ivSaldoAnterior.value === "" ? null : parseFloat(els.ivSaldoAnterior.value);
       var inicialVal = saldoAnteriorInput != null ? saldoAnteriorInput : (prev ? prev.total : (ph[per]?ph[per].inicial:0));
-      // cambioNeto = variación de mercado pura, aislada del efecto de ingresos/cargos (mismo criterio que los datos reales de Familia777)
-      var cambioNeto = (valorTotal!=null) ? ((valorTotal - inicialVal) - ingresos + cargos) : (ph[per]?ph[per].cambioNeto:0);
+      var depositosIn = els.ivPershingDepositos.value === "" ? 0 : (parseFloat(els.ivPershingDepositos.value) || 0);
+      // cambioNeto = variación de mercado pura, aislada del efecto de depósitos/ingresos/cargos (mismo criterio que los datos reales de Familia777)
+      var cambioNeto = (valorTotal!=null) ? ((valorTotal - inicialVal) - depositosIn - ingresos + cargos) : (ph[per]?ph[per].cambioNeto:0);
       var prevComp = (ph[per] && ph[per].composicion) || (prev && prev.composicion) || {};
       var efectivoIn = els.ivEfectivo.value === "" ? null : parseFloat(els.ivEfectivo.value);
       var rentaFijaIn = els.ivRentaFija.value === "" ? null : parseFloat(els.ivRentaFija.value);
@@ -3342,8 +3445,15 @@
         total: valorTotal!=null?valorTotal:(ph[per]?ph[per].total:0),
         inicial: inicialVal,
         ing: ingresos, car: cargos, cambioNeto: cambioNeto,
+        depositos: depositosIn,
         composicion: newComp
       };
+      if(pendingPershingCashDetail){
+        if(Object.keys(pendingPershingCashDetail.ingresosDetalle||{}).length) ph[per].ingresosDetalle = pendingPershingCashDetail.ingresosDetalle;
+        if(Object.keys(pendingPershingCashDetail.cargosDetalle||{}).length) ph[per].cargosDetalle = pendingPershingCashDetail.cargosDetalle;
+        if(pendingPershingCashDetail.interesDevengadoRentaFija != null) ph[per].interesDevengadoRentaFija = pendingPershingCashDetail.interesDevengadoRentaFija;
+        pendingPershingCashDetail = null;
+      }
       var accP = findInv(t.investmentId);
       if(accP){ if(valorTotal!=null) accP.value = valorTotal; accP.flujoMensual = { per:per, ing:ingresos, car:cargos, cambioNeto:cambioNeto }; }
 
@@ -3427,7 +3537,9 @@
     logIngest({ ts: new Date().toISOString(), modulo: t.label, periodo: per, resumen: resumenParts.join(" · ") || "sin datos numéricos" });
 
     els.ivPeriodo.value = ""; els.ivValorTotal.value = ""; els.ivIngresos.value = ""; els.ivCargos.value = ""; els.ivNotas.value = "";
-    els.ivSaldoAnterior.value = ""; els.ivEfectivo.value = ""; els.ivRentaFija.value = ""; els.ivFondosMutuos.value = ""; els.ivEtfs.value = ""; els.ivAlternativos.value = "";
+    els.ivSaldoAnterior.value = ""; els.ivPershingDepositos.value = ""; els.ivEfectivo.value = ""; els.ivRentaFija.value = ""; els.ivFondosMutuos.value = ""; els.ivEtfs.value = ""; els.ivAlternativos.value = "";
+    if(els.ivPershingCashDetail) els.ivPershingCashDetail.innerHTML = "";
+    pendingPershingCashDetail = null;
     els.importPreview.style.display = "none";
     els.importStatus.style.display = "none";
     els.importFile.value = "";
