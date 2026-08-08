@@ -3326,7 +3326,7 @@
             "   - fondosMutuos: [{\"fondo\":\"nombre\",\"cantidad\":0,\"costoUnit\":0,\"baseCosto\":0,\"precioMkt\":0,\"valorMkt\":0,\"gpNoReal\":0}]\n" +
             "   - bonosCorp: [{\"instrumento\":\"nombre\",\"cantidad\":0,\"costoUnit\":0,\"baseCosto\":0,\"precioMkt\":0,\"valorMkt\":0,\"gpNoReal\":0,\"interesDevengado\":0,\"vencimiento\":\"YYYY-MM-DD\",\"cusip\":\"...\"}]\n" +
             "   - etfs: [{\"etf\":\"nombre\",\"acciones\":0,\"costoUnit\":0,\"baseCosto\":0,\"precioMkt\":0,\"valorMkt\":0,\"gpNoReal\":0,\"identificador\":\"...\"}]\n" +
-            "   - blackrock: {\"valorActual\":0,\"precioAccion\":0,\"acciones\":0,\"distribucionMensual\":0,\"gpNoReal\":0} (si aparece esta posición específica)\n" +
+            "   - blackrock: {\"valorActual\":0,\"precioAccion\":0,\"acciones\":0,\"distribucionMensual\":0,\"gpNoReal\":0} (si aparece esta posición específica). IMPORTANTE: \"distribucionMensual\" normalmente NO está en la tabla de posiciones/holdings, sino en la sección de actividad/ingresos del periodo (busca \"distribution\", \"partnership distribution\" o similar relacionado a BlackRock) — debe ser el MISMO monto que reportes en ingresosDetalle.distribucionesAlternativos si BlackRock es la única inversión alternativa.\n" +
             "IMPORTANTE: si alguna sección no aparece en el documento, omítela o déjala como arreglo/objeto vacío — NO inventes posiciones, cargos ni cifras que no estén literalmente en el texto. Responde SOLO con el JSON, sin texto adicional."
           : "Este es el texto extraído de un estado de cuenta financiero:\n\n" + pdfPreviewText + "\n\nExtrae: periodo (formato YYYY-MM), saldo/valor total del periodo, ingresos/cupones/réditos/canon del periodo, y cargos/comisiones del periodo. Responde SOLO con JSON: {\"periodo\":\"YYYY-MM\",\"total\":0,\"ingresos\":0,\"cargos\":0}";
         return fetch("https://api.anthropic.com/v1/messages", {
@@ -3448,6 +3448,7 @@
         depositos: depositosIn,
         composicion: newComp
       };
+      var distribucionAlternativosFromCash = (pendingPershingCashDetail && pendingPershingCashDetail.ingresosDetalle && pendingPershingCashDetail.ingresosDetalle.distribucionesAlternativos) || null;
       if(pendingPershingCashDetail){
         if(Object.keys(pendingPershingCashDetail.ingresosDetalle||{}).length) ph[per].ingresosDetalle = pendingPershingCashDetail.ingresosDetalle;
         if(Object.keys(pendingPershingCashDetail.cargosDetalle||{}).length) ph[per].cargosDetalle = pendingPershingCashDetail.cargosDetalle;
@@ -3482,9 +3483,11 @@
           pp.blackrock.valorActual = pos.blackrock.valorActual;
           if(pos.blackrock.precioAccion != null) pp.blackrock.precioAccion = pos.blackrock.precioAccion;
           if(pos.blackrock.acciones != null) pp.blackrock.acciones = pos.blackrock.acciones;
-          if(pos.blackrock.distribucionMensual != null) pp.blackrock.distribucionMensual = pos.blackrock.distribucionMensual;
+          // si la IA no reportó la distribución dentro de "posiciones.blackrock", se usa el mismo monto que sí detectó en ingresosDetalle.distribucionesAlternativos (es el mismo dato real, visto desde otra sección del estado de cuenta)
+          var brDistribucion = pos.blackrock.distribucionMensual != null ? pos.blackrock.distribucionMensual : distribucionAlternativosFromCash;
+          if(brDistribucion != null) pp.blackrock.distribucionMensual = brDistribucion;
           var bre = pp.blackrock.historial.find(function(h){ return h.per === per; });
-          var breEntry = { per: per, valor: pos.blackrock.valorActual, distribucion: pos.blackrock.distribucionMensual||0, gpNoReal: pos.blackrock.gpNoReal||0 };
+          var breEntry = { per: per, valor: pos.blackrock.valorActual, distribucion: brDistribucion||0, gpNoReal: pos.blackrock.gpNoReal||0 };
           if(bre){ Object.assign(bre, breEntry); }
           else { pp.blackrock.historial.push(breEntry); }
         }
