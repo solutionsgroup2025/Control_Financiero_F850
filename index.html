@@ -950,6 +950,18 @@
             <div id="swpHistorialList"></div>
           </div>
         </div>
+
+        <div class="table-card" style="padding:20px 22px;margin-top:16px;">
+          <h3 style="margin:0 0 4px;">📊 Análisis Consolidado — Comportamiento por Año</h3>
+          <p class="sub" style="margin:0 0 14px;" id="swpConsNote">&nbsp;</p>
+          <div class="matrix-wrap" style="margin-bottom:20px;"><table class="matrix" id="swpConsAnualTable" style="font-size:12.5px;"></table></div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+            <h3 style="margin:0;font-size:13px;">Detalle Mensual</h3>
+            <div class="month-bar" id="swpConsYearSelector" style="margin-bottom:0;"></div>
+          </div>
+          <div class="matrix-wrap"><table class="matrix" id="swpConsMesesTable" style="font-size:12px;"></table></div>
+        </div>
       </div>
 
     </div>
@@ -1196,6 +1208,10 @@
     swlHistorialTable: document.getElementById("swlHistorialTable"),
     swlHistYearSelector: document.getElementById("swlHistYearSelector"),
     swpMonths: document.getElementById("swpMonths"),
+    swpConsNote: document.getElementById("swpConsNote"),
+    swpConsAnualTable: document.getElementById("swpConsAnualTable"),
+    swpConsYearSelector: document.getElementById("swpConsYearSelector"),
+    swpConsMesesTable: document.getElementById("swpConsMesesTable"),
     swpKpis: document.getElementById("swpKpis"),
     swpComposicion: document.getElementById("swpComposicion"),
     swpComparacion: document.getElementById("swpComparacion"),
@@ -2509,7 +2525,67 @@
     return mn[parseInt(parts[1],10)-1] + " " + parts[0].slice(2);
   }
 
+  var swpConsYear = null;
+  var SWP_CONS_MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+
+  function renderPershingConsolidado(){
+    var cons = backup.state.pershingConsolidado;
+    if(!cons || !cons.years || !Object.keys(cons.years).length){
+      els.swpConsNote.textContent = "";
+      els.swpConsAnualTable.innerHTML = "";
+      els.swpConsYearSelector.innerHTML = "";
+      els.swpConsMesesTable.innerHTML = "";
+      return;
+    }
+    els.swpConsNote.textContent = "Extracto real de la cuenta Pershing (" + (cons.fuente||"") + "). \"Saldo\" es el valor tal como aparece en el estado de cuenta mensual de origen — algunos meses reflejan el saldo de apertura del mes.";
+
+    var years = Object.keys(cons.years).sort();
+    var head = "<tr><th style='text-align:left'>Año</th><th>Depósitos</th><th>Dividendos</th><th>Cargos</th><th>Cambio de Mercado</th><th>Ganancia/Pérdida Neta</th><th>Rendimiento</th></tr>";
+    var rows = years.map(function(y){
+      var r = cons.years[y].resumen;
+      var rpVal = r.rendimientoPctSuma || 0;
+      var rp = (rpVal*100).toFixed(1) + "%";
+      return "<tr><td style='text-align:left;font-weight:700;color:var(--text)'>" + escapeHtml(y) + "</td>" +
+        "<td>" + fmtMoney(r.depositos) + "</td>" +
+        "<td style='color:var(--emerald)'>" + fmtMoney(r.dividendos) + "</td>" +
+        "<td style='color:var(--red)'>" + fmtMoney(r.cargos) + "</td>" +
+        "<td style='color:" + ((r.cambioNeto||0)>=0?"var(--emerald)":"var(--red)") + "'>" + ((r.cambioNeto||0)>=0?"+":"") + fmtMoney(r.cambioNeto) + "</td>" +
+        "<td style='font-weight:700;color:" + ((r.gananciaPerdida||0)>=0?"var(--emerald)":"var(--red)") + "'>" + ((r.gananciaPerdida||0)>=0?"+":"") + fmtMoney(r.gananciaPerdida) + "</td>" +
+        "<td style='font-weight:700;color:" + (rpVal>=0?"var(--emerald)":"var(--red)") + "'>" + rp + "</td></tr>";
+    }).join("");
+    els.swpConsAnualTable.innerHTML = head + rows;
+
+    if(!swpConsYear || years.indexOf(swpConsYear) === -1) swpConsYear = years[years.length-1];
+    els.swpConsYearSelector.innerHTML = years.slice().reverse().map(function(y){
+      return '<button class="month-btn' + (y===swpConsYear?' on':'') + '" data-year="' + y + '">' + y + '</button>';
+    }).join("");
+    els.swpConsYearSelector.querySelectorAll(".month-btn").forEach(function(btn){
+      btn.addEventListener("click", function(){ swpConsYear = btn.getAttribute("data-year"); renderPershingConsolidado(); });
+    });
+
+    buildSwpConsMesesTable(cons.years[swpConsYear].meses || {});
+  }
+
+  function buildSwpConsMesesTable(meses){
+    var head = "<tr><th style='text-align:left'>Mes</th><th>Saldo</th><th>Depósitos</th><th>Dividendos</th><th>Cargos</th><th>Cambio Mercado</th><th>Ganancia/Pérdida</th><th>Rendimiento</th></tr>";
+    var rows = SWP_CONS_MESES.map(function(m){
+      var e = meses[m];
+      if(!e) return "<tr><td style='text-align:left;color:var(--text-dim)'>" + m + "</td><td colspan='7' style='color:var(--text-dim)'>—</td></tr>";
+      var rp = e.rendimientoPct != null ? (e.rendimientoPct*100).toFixed(1)+"%" : "—";
+      return "<tr><td style='text-align:left;font-weight:700;color:var(--text)'>" + m + "</td>" +
+        "<td>" + (e.saldo!=null?fmtMoney(e.saldo):"—") + "</td>" +
+        "<td>" + (e.depositos?fmtMoney(e.depositos):"—") + "</td>" +
+        "<td style='color:var(--emerald)'>" + (e.dividendos?fmtMoney(e.dividendos):"—") + "</td>" +
+        "<td style='color:var(--red)'>" + (e.cargos?fmtMoney(e.cargos):"—") + "</td>" +
+        "<td style='color:" + ((e.cambioNeto||0)>=0?"var(--emerald)":"var(--red)") + "'>" + (e.cambioNeto!=null?((e.cambioNeto>=0?"+":"")+fmtMoney(e.cambioNeto)):"—") + "</td>" +
+        "<td style='font-weight:600;color:" + ((e.gananciaPerdida||0)>=0?"var(--emerald)":"var(--red)") + "'>" + (e.gananciaPerdida!=null?((e.gananciaPerdida>=0?"+":"")+fmtMoney(e.gananciaPerdida)):"—") + "</td>" +
+        "<td style='color:" + ((e.rendimientoPct||0)>=0?"var(--emerald)":"var(--red)") + "'>" + rp + "</td></tr>";
+    }).join("");
+    els.swpConsMesesTable.innerHTML = head + rows;
+  }
+
   function renderSwPershing(){
+    renderPershingConsolidado();
     var hist = backup.state.pershingHistorial || {};
     var periods = Object.keys(hist).sort().reverse();
     if(!periods.length){ return; }
