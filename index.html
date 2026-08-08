@@ -721,6 +721,7 @@
               <div class="form-field"><label>Fondos Mutuos</label><input type="number" step="0.01" id="ivFondosMutuos" placeholder="0.00"></div>
               <div class="form-field"><label>ETFs</label><input type="number" step="0.01" id="ivEtfs" placeholder="0.00"></div>
               <div class="form-field"><label>Alternativos</label><input type="number" step="0.01" id="ivAlternativos" placeholder="0.00"></div>
+              <div class="form-field full" id="ivPershingPosSummary" style="color:var(--text-muted);font-size:12.5px;"></div>
             </div>
             <div class="form-grid" style="margin-top:12px;">
               <div class="form-field full">
@@ -943,6 +944,10 @@
           </div>
           <div class="tab-panel" data-panel="blackrock" id="swpPanelBlackrock">
             <div class="kpi-grid-3" id="swpBlackrockKpis" style="margin-bottom:16px;"></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+              <p class="sub" style="margin:0;" id="swpBrYearTotal"></p>
+              <div class="month-bar" id="swpBrYearSelector" style="margin-bottom:0;"></div>
+            </div>
             <div class="matrix-wrap"><table class="matrix" id="swpBlackrockTable" style="font-size:12.5px;"></table></div>
             <div id="swpBlackrockNota"></div>
           </div>
@@ -1222,6 +1227,8 @@
     swpBlackrockKpis: document.getElementById("swpBlackrockKpis"),
     swpBlackrockTable: document.getElementById("swpBlackrockTable"),
     swpBlackrockNota: document.getElementById("swpBlackrockNota"),
+    swpBrYearSelector: document.getElementById("swpBrYearSelector"),
+    swpBrYearTotal: document.getElementById("swpBrYearTotal"),
     swpHistorialList: document.getElementById("swpHistorialList"),
     rl360Kpis: document.getElementById("rl360Kpis"),
     rl360FondosTable: document.getElementById("rl360FondosTable"),
@@ -1267,6 +1274,7 @@
     ivFondosMutuos: document.getElementById("ivFondosMutuos"),
     ivEtfs: document.getElementById("ivEtfs"),
     ivAlternativos: document.getElementById("ivAlternativos"),
+    ivPershingPosSummary: document.getElementById("ivPershingPosSummary"),
     btnApplyIngest: document.getElementById("btnApplyIngest"),
     ingestLog: document.getElementById("ingestLog"),
     tesYearSelector: document.getElementById("tesYearSelector"),
@@ -2640,14 +2648,23 @@
       '<span>Resumen: ' + fmtMoney(valorInicial) + ' inicial + ' + fmtMoney(d.ing) + ' ingresos − ' + fmtMoney(d.car) + ' cargos ' + (chg>=0?'+':'−') + ' ' + fmtMoney(Math.abs(chg)) + ' cambio mercado = ' + fmtMoney(d.total) + ' final</span></div>';
     els.swpComparacion.innerHTML = compHtml;
 
-    renderSwpPosiciones();
+    renderSwpPosiciones(per);
   }
 
   /* ---------- SW Pershing: detalle posición por posición (datos reales) ---------- */
-  function renderSwpPosiciones(){
-    var p = backup.state.pershingPosiciones;
-    if(!p) return;
-    els.swpPosicionesAsOf.textContent = "Detalle al corte de " + monthLabel(p.asOf);
+  function renderSwpPosiciones(selectedPer){
+    var root = backup.state.pershingPosiciones;
+    if(!root || !root.snapshots){ return; }
+    var snapPeriods = Object.keys(root.snapshots).sort();
+    if(!snapPeriods.length){ return; }
+    var snapPer = snapPeriods.indexOf(selectedPer) !== -1 ? selectedPer : snapPeriods[snapPeriods.length-1];
+    var p = root.snapshots[snapPer];
+
+    if(snapPer === selectedPer){
+      els.swpPosicionesAsOf.textContent = "Detalle al corte de " + monthLabel(snapPer);
+    } else {
+      els.swpPosicionesAsOf.innerHTML = "Sin detalle de posiciones para " + monthLabel(selectedPer) + " todavía — mostrando la última carga disponible: <strong>" + monthLabel(snapPer) + "</strong>. Sube el estado de cuenta de ese mes para actualizarlo.";
+    }
 
     var fHead = "<tr><th style='text-align:left'>Fondo</th><th>Cantidad</th><th>Costo Unit.</th><th>Base Costo</th><th>Precio Mkt</th><th>Valor Mkt</th><th>G/P No Real.</th></tr>";
     var fRows = (p.fondosMutuos||[]).map(function(f){
@@ -2678,16 +2695,13 @@
     var eTotRow = "<tr class='matrix-total'><td>TOTAL ETFs</td><td>" + (eTot.acciones||0).toLocaleString() + "</td><td></td><td>" + fmtMoney(eTot.baseCosto) + "</td><td></td><td>" + fmtMoney(eTot.valorMkt) + "</td><td style='color:var(--emerald)'>+" + fmtMoney(eTot.gpNoReal) + "</td></tr>";
     els.swpEtfsTable.innerHTML = eHead + eRows + eTotRow;
 
-    var br = p.blackrock || {};
+    var br = root.blackrock || {};
     els.swpBlackrockKpis.innerHTML =
       '<div class="summary-card" style="--accent:var(--violet)"><div class="label">VALOR ACTUAL</div><div class="value">' + fmtMoney(br.valorActual) + '</div><div class="foot">' + (br.acciones||0) + ' acc. × ' + fmtMoney(br.precioAccion) + '</div></div>' +
       '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">DISTRIBUCIÓN MENSUAL</div><div class="value" style="color:var(--emerald)">' + fmtMoney(br.distribucionMensual) + '</div><div class="foot">Partnership distribution</div></div>' +
       '<div class="summary-card" style="--accent:var(--blue)"><div class="label">CATEGORÍA</div><div class="value" style="font-size:16px;">Alternativo Ilíquido</div><div class="foot">No cotiza en bolsa</div></div>';
-    var brHead = "<tr><th style='text-align:left'>Período</th><th>Valor</th><th>Distribución</th><th>G/P No Real.</th></tr>";
-    var brRows = (br.historial||[]).map(function(h){
-      return "<tr><td>" + monthLabel(h.per) + "</td><td>" + fmtMoney(h.valor) + "</td><td style='color:var(--emerald)'>" + fmtMoney(h.distribucion) + "</td><td style='color:var(--red)'>" + fmtMoney(h.gpNoReal) + "</td></tr>";
-    }).join("");
-    els.swpBlackrockTable.innerHTML = brHead + brRows;
+
+    buildSwpBlackrockYearView(br.historial || []);
     els.swpBlackrockNota.innerHTML = br.nota ? '<div class="alert-banner info" style="margin-top:12px;"><div class="at">Nota</div><div class="ax">' + escapeHtml(br.nota) + '</div></div>' : "";
 
     var hist = backup.state.pershingHistorial || {};
@@ -2697,6 +2711,37 @@
       var prevD2 = periods[periods.indexOf(per)-1] ? hist[periods[periods.indexOf(per)-1]] : null;
       return '<div class="sr"><span class="lbl">' + monthLabel(per) + '</span><span class="val">Inicial ' + fmtMoney(d2.inicial!=null?d2.inicial:(prevD2?prevD2.total:0)) + ' → Final ' + fmtMoney(d2.total) + ' (' + (d2.cambioNeto>=0?"+":"") + fmtMoney(d2.cambioNeto) + ')</span></div>';
     }).join("") || '<div class="mv-empty">Sin historial.</div>';
+  }
+
+  var swpBrYear = null;
+
+  function buildSwpBlackrockYearView(historial){
+    var years = Array.from(new Set(historial.map(function(h){ return h.per.slice(0,4); }))).sort(function(a,b){ return b.localeCompare(a); });
+    if(!years.length){
+      els.swpBrYearSelector.innerHTML = "";
+      els.swpBrYearTotal.textContent = "";
+      els.swpBlackrockTable.innerHTML = "<tr><td style='text-align:center;color:var(--text-dim);padding:18px;'>Sin historial de BlackRock todavía.</td></tr>";
+      return;
+    }
+    if(!swpBrYear || years.indexOf(swpBrYear) === -1) swpBrYear = years[0];
+
+    els.swpBrYearSelector.innerHTML = years.map(function(y){
+      return '<button class="month-btn' + (y===swpBrYear?' on':'') + '" data-year="' + y + '">' + y + '</button>';
+    }).join("");
+    els.swpBrYearSelector.querySelectorAll(".month-btn").forEach(function(btn){
+      btn.addEventListener("click", function(){ swpBrYear = btn.getAttribute("data-year"); buildSwpBlackrockYearView(historial); });
+    });
+
+    var filtered = historial.filter(function(h){ return h.per.slice(0,4) === swpBrYear; }).sort(function(a,b){ return a.per<b.per?-1:1; });
+    var totDist = filtered.reduce(function(s,h){ return s+(h.distribucion||0); },0);
+    els.swpBrYearTotal.innerHTML = "Total distribuciones recibidas en <strong style='color:var(--emerald)'>" + swpBrYear + "</strong>: <strong style='color:var(--emerald)'>" + fmtMoney(totDist) + "</strong> (" + filtered.length + " meses registrados)";
+
+    var brHead = "<tr><th style='text-align:left'>Período</th><th>Valor</th><th>Distribución</th><th>G/P No Real.</th></tr>";
+    var brRows = filtered.map(function(h){
+      return "<tr><td>" + monthLabel(h.per) + "</td><td>" + fmtMoney(h.valor) + "</td><td style='color:var(--emerald)'>" + fmtMoney(h.distribucion) + "</td><td style='color:var(--red)'>" + fmtMoney(h.gpNoReal) + "</td></tr>";
+    }).join("");
+    var totRow = "<tr class='matrix-total'><td>TOTAL " + escapeHtml(swpBrYear) + "</td><td></td><td style='color:var(--emerald)'>" + fmtMoney(totDist) + "</td><td></td></tr>";
+    els.swpBlackrockTable.innerHTML = brHead + (brRows || "<tr><td colspan='4' style='text-align:center;color:var(--text-dim);padding:18px;'>Sin registros para " + escapeHtml(swpBrYear) + ".</td></tr>") + totRow;
   }
 
   /* ---------- RL360 (pólizas y fondos) ---------- */
@@ -3093,12 +3138,37 @@
     });
   }
 
+  var pendingPershingPositions = null;
+
   function prefillReviewForm(obj){
     if(!obj) return;
     if(obj.periodo && /^\d{4}-\d{2}$/.test(obj.periodo)) els.ivPeriodo.value = obj.periodo;
     if(obj.total != null) els.ivValorTotal.value = obj.total;
     if(obj.ingresos != null) els.ivIngresos.value = obj.ingresos;
     if(obj.cargos != null) els.ivCargos.value = obj.cargos;
+    if(obj.composicion){
+      if(obj.composicion.efectivo != null) els.ivEfectivo.value = obj.composicion.efectivo;
+      if(obj.composicion.bonos != null) els.ivRentaFija.value = obj.composicion.bonos;
+      if(obj.composicion.fondos != null) els.ivFondosMutuos.value = obj.composicion.fondos;
+      if(obj.composicion.etf != null) els.ivEtfs.value = obj.composicion.etf;
+      if(obj.composicion.alternativos != null) els.ivAlternativos.value = obj.composicion.alternativos;
+    }
+    pendingPershingPositions = obj.posiciones || null;
+    if(els.ivPershingPosSummary){
+      if(pendingPershingPositions){
+        var p = pendingPershingPositions;
+        var parts = [];
+        if((p.fondosMutuos||[]).length) parts.push((p.fondosMutuos.length) + " fondos mutuos");
+        if((p.bonosCorp||[]).length) parts.push((p.bonosCorp.length) + " bonos corp.");
+        if((p.etfs||[]).length) parts.push((p.etfs.length) + " ETFs");
+        if(p.blackrock && p.blackrock.valorActual != null) parts.push("BlackRock " + fmtMoney(p.blackrock.valorActual));
+        els.ivPershingPosSummary.textContent = parts.length
+          ? "✓ Detalle de posiciones detectado: " + parts.join(", ") + " — revisa el JSON de arriba antes de aplicar."
+          : "No se detectó tabla de posiciones en este documento (se aplicarán solo los totales).";
+      } else {
+        els.ivPershingPosSummary.textContent = "";
+      }
+    }
   }
 
   function extractJsonBlock(text){
@@ -3141,8 +3211,24 @@
         if(text.length < 20){
           throw new Error("Este PDF no parece tener texto legible (podría ser una imagen escaneada). Prueba con un PDF generado digitalmente, o usa CSV/JSON.");
         }
-        pdfPreviewText = text.length > 12000 ? text.slice(0,12000) : text;
+        pdfPreviewText = text.length > 20000 ? text.slice(0,20000) : text;
         els.importStatus.textContent = "Interpretando " + file.name + " con IA…";
+        var isPershing = els.importTarget.value === "sw-pershing";
+        var promptText = isPershing
+          ? "Este es el texto extraído de un estado de cuenta de Pershing (multi-activo: fondos mutuos, bonos corporativos, ETFs, y una posición BlackRock):\n\n" + pdfPreviewText +
+            "\n\nExtrae TODO lo siguiente:\n" +
+            "1. periodo (formato YYYY-MM, el mes del corte del estado de cuenta)\n" +
+            "2. total: valor total de la cuenta al final del periodo\n" +
+            "3. ingresos: ingresos brutos del periodo (dividendos, intereses, etc.)\n" +
+            "4. cargos: cargos/comisiones del periodo\n" +
+            "5. composicion (opcional, si el documento lo muestra por clase de activo): {\"efectivo\":0,\"bonos\":0,\"fondos\":0,\"etf\":0,\"alternativos\":0}\n" +
+            "6. posiciones: el detalle línea por línea de CADA posición individual que encuentres:\n" +
+            "   - fondosMutuos: [{\"fondo\":\"nombre\",\"cantidad\":0,\"costoUnit\":0,\"baseCosto\":0,\"precioMkt\":0,\"valorMkt\":0,\"gpNoReal\":0}]\n" +
+            "   - bonosCorp: [{\"instrumento\":\"nombre\",\"cantidad\":0,\"costoUnit\":0,\"baseCosto\":0,\"precioMkt\":0,\"valorMkt\":0,\"gpNoReal\":0,\"interesDevengado\":0,\"vencimiento\":\"YYYY-MM-DD\",\"cusip\":\"...\"}]\n" +
+            "   - etfs: [{\"etf\":\"nombre\",\"acciones\":0,\"costoUnit\":0,\"baseCosto\":0,\"precioMkt\":0,\"valorMkt\":0,\"gpNoReal\":0,\"identificador\":\"...\"}]\n" +
+            "   - blackrock: {\"valorActual\":0,\"precioAccion\":0,\"acciones\":0,\"distribucionMensual\":0,\"gpNoReal\":0} (si aparece esta posición específica)\n" +
+            "IMPORTANTE: si alguna sección no aparece en el documento, omítela o déjala como arreglo vacío — NO inventes posiciones ni cifras. Responde SOLO con el JSON, sin texto adicional."
+          : "Este es el texto extraído de un estado de cuenta financiero:\n\n" + pdfPreviewText + "\n\nExtrae: periodo (formato YYYY-MM), saldo/valor total del periodo, ingresos/cupones/réditos/canon del periodo, y cargos/comisiones del periodo. Responde SOLO con JSON: {\"periodo\":\"YYYY-MM\",\"total\":0,\"ingresos\":0,\"cargos\":0}";
         return fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
           headers: {
@@ -3153,11 +3239,8 @@
           },
           body: JSON.stringify({
             model: "claude-sonnet-4-5",
-            max_tokens: 1024,
-            messages: [{
-              role: "user",
-              content: "Este es el texto extraído de un estado de cuenta financiero:\n\n" + pdfPreviewText + "\n\nExtrae: periodo (formato YYYY-MM), saldo/valor total del periodo, ingresos/cupones/réditos/canon del periodo, y cargos/comisiones del periodo. Responde SOLO con JSON: {\"periodo\":\"YYYY-MM\",\"total\":0,\"ingresos\":0,\"cargos\":0}"
-            }]
+            max_tokens: isPershing ? 4096 : 1024,
+            messages: [{ role: "user", content: promptText }]
           })
         });
       }).then(function(res){ return res.json(); })
@@ -3263,6 +3346,40 @@
       };
       var accP = findInv(t.investmentId);
       if(accP){ if(valorTotal!=null) accP.value = valorTotal; accP.flujoMensual = { per:per, ing:ingresos, car:cargos, cambioNeto:cambioNeto }; }
+
+      // Detalle de posiciones (fondos/bonos/ETFs/BlackRock) extraído del PDF, si el documento lo traía
+      if(pendingPershingPositions){
+        var pp = backup.state.pershingPosiciones || (backup.state.pershingPosiciones = { snapshots:{}, blackrock:{ historial:[] } });
+        if(!pp.snapshots) pp.snapshots = {};
+        var pos = pendingPershingPositions;
+
+        if((pos.fondosMutuos && pos.fondosMutuos.length) || (pos.bonosCorp && pos.bonosCorp.length) || (pos.etfs && pos.etfs.length)){
+          var sumField = function(arr, field){ return (arr||[]).reduce(function(s,x){ return s+(x[field]||0); },0); };
+          pp.snapshots[per] = {
+            asOf: per,
+            fondosMutuos: pos.fondosMutuos || [],
+            totalFondosMutuos: { baseCosto: sumField(pos.fondosMutuos,"baseCosto"), valorMkt: sumField(pos.fondosMutuos,"valorMkt"), gpNoReal: sumField(pos.fondosMutuos,"gpNoReal") },
+            bonosCorp: pos.bonosCorp || [],
+            totalBonosCorp: { cantidad: sumField(pos.bonosCorp,"cantidad"), baseCosto: sumField(pos.bonosCorp,"baseCosto"), valorMkt: sumField(pos.bonosCorp,"valorMkt"), gpNoReal: sumField(pos.bonosCorp,"gpNoReal"), interesDevengado: sumField(pos.bonosCorp,"interesDevengado") },
+            etfs: pos.etfs || [],
+            totalEtfs: { acciones: sumField(pos.etfs,"acciones"), baseCosto: sumField(pos.etfs,"baseCosto"), valorMkt: sumField(pos.etfs,"valorMkt"), gpNoReal: sumField(pos.etfs,"gpNoReal") }
+          };
+        }
+
+        if(pos.blackrock && pos.blackrock.valorActual != null){
+          if(!pp.blackrock) pp.blackrock = { historial:[] };
+          if(!Array.isArray(pp.blackrock.historial)) pp.blackrock.historial = [];
+          pp.blackrock.valorActual = pos.blackrock.valorActual;
+          if(pos.blackrock.precioAccion != null) pp.blackrock.precioAccion = pos.blackrock.precioAccion;
+          if(pos.blackrock.acciones != null) pp.blackrock.acciones = pos.blackrock.acciones;
+          if(pos.blackrock.distribucionMensual != null) pp.blackrock.distribucionMensual = pos.blackrock.distribucionMensual;
+          var bre = pp.blackrock.historial.find(function(h){ return h.per === per; });
+          var breEntry = { per: per, valor: pos.blackrock.valorActual, distribucion: pos.blackrock.distribucionMensual||0, gpNoReal: pos.blackrock.gpNoReal||0 };
+          if(bre){ Object.assign(bre, breEntry); }
+          else { pp.blackrock.historial.push(breEntry); }
+        }
+        pendingPershingPositions = null;
+      }
     }
     else if(t.kind === "rl360"){
       var r = backup.state.rl360 || (backup.state.rl360 = {});
