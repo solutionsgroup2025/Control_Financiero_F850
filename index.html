@@ -44,6 +44,8 @@
   .auth-card .sub{margin:0 0 22px;color:var(--text-muted);font-size:13px;}
   .auth-card form{text-align:left;display:flex;flex-direction:column;gap:14px;}
   .auth-error{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:9px 11px;font-size:12.5px;}
+  .auth-info{background:rgba(16,185,129,.12);color:var(--emerald);border:1px solid rgba(16,185,129,.3);border-radius:8px;padding:9px 11px;font-size:12.5px;}
+  .readonly-banner{background:rgba(245,158,11,.12);color:var(--amber);border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:10px 14px;font-size:12.5px;font-weight:600;margin-bottom:16px;display:none;}
   .auth-note{margin:20px 0 0;font-size:11px;color:var(--text-dim);line-height:1.5;}
 
   /* ---------- sidebar ---------- */
@@ -322,7 +324,9 @@
         <input type="password" id="authPassword" autocomplete="current-password" required="" placeholder="••••••••">
       </div>
       <div id="authError" class="auth-error" style="display:none;"></div>
+      <div id="authInfo" class="auth-info" style="display:none;"></div>
       <button type="submit" class="btn btn-primary" id="authSubmit" style="width:100%;justify-content:center;margin-top:6px;">Entrar</button>
+      <button type="button" id="authForgotBtn" style="background:none;border:none;color:var(--text-muted);font-size:12px;text-decoration:underline;cursor:pointer;padding:4px 0;">¿Olvidaste tu contraseña?</button>
     </form>
     <p class="auth-note">Este panel es de uso exclusivo de la familia. Si no tienes acceso, contacta a Edson o Monique.</p>
   </div>
@@ -449,6 +453,8 @@
         <button id="btnUpdate" class="btn btn-primary" style="display: inline-flex;">+ Actualizar Saldo</button>
       </div>
     </div>
+
+    <div id="readonlyBanner" class="readonly-banner">👁️ Modo solo lectura — puedes ver todo, pero los cambios no se guardan. Pídele a un administrador que te dé permiso de edición si lo necesitas.</div>
 
     <div id="loaderPanel" class="loader-panel" style="display: none;">
       <h2>Cargando datos…</h2>
@@ -735,10 +741,28 @@
         <div class="module-note" id="usersNote">Cargando…</div>
 
         <div class="table-card" style="padding:20px 22px;margin-bottom:16px;">
+          <h3 style="margin:0 0 4px;">Mi Cuenta</h3>
+          <p class="sub" style="margin:0 0 14px;" id="myAccountEmail">&nbsp;</p>
+          <div class="form-grid" style="max-width:520px;">
+            <div class="form-field">
+              <label for="myNewPassword">Nueva contraseña</label>
+              <input type="password" id="myNewPassword" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+            </div>
+            <div class="form-field">
+              <label for="myNewPassword2">Confirmar nueva contraseña</label>
+              <input type="password" id="myNewPassword2" placeholder="Repite la contraseña" autocomplete="new-password">
+            </div>
+          </div>
+          <div class="form-actions" style="justify-content:flex-start;margin-top:12px;">
+            <button type="button" class="btn btn-primary" id="btnChangeMyPassword">Cambiar mi contraseña</button>
+          </div>
+        </div>
+
+        <div class="table-card" style="padding:20px 22px;margin-bottom:16px;">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px;">
             <div>
               <h3 style="margin:0 0 4px;">Usuarios con Acceso</h3>
-              <p class="sub" style="margin:0;">Quién puede entrar al tablero. Solo un administrador puede agregar o quitar acceso.</p>
+              <p class="sub" style="margin:0;">Quién puede entrar al tablero. Solo un administrador puede cambiar roles, desactivar o dar de alta.</p>
             </div>
             <button class="btn btn-primary" id="btnAddUser" style="display:none;">+ Dar de Alta Usuario</button>
           </div>
@@ -1309,6 +1333,13 @@
     authPassword: document.getElementById("authPassword"),
     authError: document.getElementById("authError"),
     authSubmit: document.getElementById("authSubmit"),
+    authInfo: document.getElementById("authInfo"),
+    authForgotBtn: document.getElementById("authForgotBtn"),
+    readonlyBanner: document.getElementById("readonlyBanner"),
+    myAccountEmail: document.getElementById("myAccountEmail"),
+    myNewPassword: document.getElementById("myNewPassword"),
+    myNewPassword2: document.getElementById("myNewPassword2"),
+    btnChangeMyPassword: document.getElementById("btnChangeMyPassword"),
     usersNote: document.getElementById("usersNote"),
     usersTable: document.getElementById("usersTable"),
     btnAddUser: document.getElementById("btnAddUser"),
@@ -1431,69 +1462,136 @@
   }
 
   /* ---------- Usuarios y Actividad ---------- */
+  var ROLE_LABELS = { admin:"Administrador", editor:"Editor", viewer:"Solo Lectura" };
+  var ROLE_COLORS = { admin:"#8b5cf6", editor:"#3b82f6", viewer:"#7c93ad" };
+
   function renderUsersActivity(){
     if(!supa){
       els.usersNote.textContent = "Supabase no está configurado — la gestión de usuarios solo funciona en el tablero publicado en la nube.";
       els.usersTable.innerHTML = "";
       els.activityLogTable.innerHTML = "";
       els.btnAddUser.style.display = "none";
+      els.myAccountEmail.textContent = "";
       return;
     }
+    els.myAccountEmail.textContent = currentUser ? ("Sesión iniciada como " + currentUser.email + " · Rol: " + (ROLE_LABELS[currentUserRole]||currentUserRole)) : "";
     els.usersNote.textContent = currentUserIsAdmin
-      ? "Eres administrador — puedes dar de alta o quitar acceso. Dar de alta aquí solo autoriza el correo; la persona necesita además una cuenta creada en Supabase (Authentication → Users) con ese mismo correo para poder iniciar sesión."
-      : "Solo un administrador puede agregar o quitar usuarios. Aquí puedes ver la bitácora de actividad.";
+      ? "Eres administrador — puedes cambiar el rol de cada quien, desactivar/reactivar su acceso o dar de alta a alguien nuevo. Dar de alta aquí solo autoriza el correo; la persona necesita además una cuenta creada en Supabase (Authentication → Users) con ese mismo correo para poder iniciar sesión."
+      : "Solo un administrador puede gestionar usuarios. Aquí puedes ver quién tiene acceso y la bitácora de actividad.";
     els.btnAddUser.style.display = currentUserIsAdmin ? "inline-flex" : "none";
 
-    supa.from("allowed_users").select("email,nombre,is_admin,added_at").order("added_at", { ascending: true })
-      .then(function(res){
-        if(res.error) throw res.error;
-        buildUsersTable(res.data || []);
-      })
-      .catch(function(err){
-        els.usersTable.innerHTML = "<tr><td style='text-align:center;color:var(--text-dim);padding:18px;'>No se pudo cargar la lista de usuarios.</td></tr>";
-        console.error("allowed_users load error:", err);
-      });
-
-    supa.from("activity_log").select("user_email,action,created_at").order("created_at", { ascending: false }).limit(100)
-      .then(function(res){
-        if(res.error) throw res.error;
-        buildActivityLogTable(res.data || []);
-      })
-      .catch(function(err){
-        els.activityLogTable.innerHTML = "<tr><td style='text-align:center;color:var(--text-dim);padding:18px;'>No se pudo cargar la bitácora.</td></tr>";
-        console.error("activity_log load error:", err);
-      });
+    Promise.all([
+      supa.from("allowed_users").select("email,nombre,role,active,added_at").order("added_at", { ascending: true }),
+      supa.from("activity_log").select("user_email,action,created_at").order("created_at", { ascending: false }).limit(200)
+    ]).then(function(results){
+      var usersRes = results[0], logRes = results[1];
+      if(usersRes.error) throw usersRes.error;
+      if(logRes.error) throw logRes.error;
+      var lastSeen = {};
+      (logRes.data||[]).forEach(function(r){ if(!lastSeen[r.user_email]) lastSeen[r.user_email] = r.created_at; });
+      buildUsersTable(usersRes.data || [], lastSeen);
+      buildActivityLogTable((logRes.data||[]).slice(0,100));
+    }).catch(function(err){
+      els.usersTable.innerHTML = "<tr><td style='text-align:center;color:var(--text-dim);padding:18px;'>No se pudo cargar la lista de usuarios.</td></tr>";
+      els.activityLogTable.innerHTML = "<tr><td style='text-align:center;color:var(--text-dim);padding:18px;'>No se pudo cargar la bitácora.</td></tr>";
+      console.error("Users/activity load error:", err);
+    });
   }
 
-  function buildUsersTable(users){
-    var head = "<tr><th style='text-align:left'>Correo</th><th style='text-align:left'>Nombre</th><th>Rol</th><th style='text-align:left'>Desde</th><th></th></tr>";
+  function buildUsersTable(users, lastSeen){
+    var head = "<tr><th style='text-align:left'>Correo</th><th style='text-align:left'>Nombre</th><th>Rol</th><th>Estado</th><th style='text-align:left'>Último acceso</th><th style='text-align:left'>Desde</th><th></th></tr>";
     var rows = users.map(function(u){
       var isSelf = currentUser && u.email === currentUser.email;
-      var delBtn = (currentUserIsAdmin && !isSelf)
-        ? "<button type='button' class='btn btn-secondary users-del' data-email=\"" + escapeHtml(u.email) + "\" style='padding:4px 9px;font-size:11px;color:var(--red);'>Quitar acceso</button>"
-        : "";
-      return "<tr>" +
+      var role = u.role || "editor";
+      var active = u.active !== false;
+
+      var roleCell;
+      if(currentUserIsAdmin && !isSelf){
+        roleCell = "<select class='dp-select users-role' data-email=\"" + escapeHtml(u.email) + "\">" +
+          Object.keys(ROLE_LABELS).map(function(r){ return "<option value='"+r+"'"+(r===role?" selected":"")+">"+ROLE_LABELS[r]+"</option>"; }).join("") +
+          "</select>";
+      }else{
+        roleCell = "<span class='pill' style='background:" + hexToRgba(ROLE_COLORS[role]||"#3b82f6",0.15) + ";color:" + (ROLE_COLORS[role]||"#3b82f6") + ";'>" + (ROLE_LABELS[role]||role) + "</span>";
+      }
+
+      var estadoCell = active
+        ? "<span class='pill' style='background:" + hexToRgba("#10b981",0.15) + ";color:var(--emerald);'>Activo</span>"
+        : "<span class='pill' style='background:" + hexToRgba("#ef4444",0.15) + ";color:var(--red);'>Inactivo</span>";
+
+      var lastSeenTxt = "—";
+      if(lastSeen[u.email]){
+        var d = new Date(lastSeen[u.email]);
+        if(!isNaN(d.getTime())) lastSeenTxt = d.toLocaleString("es-PA",{year:"numeric",month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"});
+      }
+
+      var actions = "";
+      if(currentUserIsAdmin && !isSelf){
+        actions += "<button type='button' class='btn btn-secondary users-toggle-active' data-email=\"" + escapeHtml(u.email) + "\" data-active=\"" + (active?"1":"0") + "\" style='padding:4px 9px;font-size:11px;margin-right:6px;" + (active?"color:var(--amber);":"color:var(--emerald);") + "'>" + (active?"Desactivar":"Reactivar") + "</button>";
+        actions += "<button type='button' class='btn btn-secondary users-del' data-email=\"" + escapeHtml(u.email) + "\" style='padding:4px 9px;font-size:11px;color:var(--red);'>Eliminar</button>";
+      }
+
+      return "<tr" + (active?"":" style='opacity:.55'") + ">" +
         "<td style='text-align:left;font-weight:700;color:var(--text)'>" + escapeHtml(u.email) + (isSelf?" <span style='color:var(--text-dim);font-weight:400;'>(tú)</span>":"") + "</td>" +
         "<td style='text-align:left;color:var(--text-muted)'>" + escapeHtml(u.nombre||"—") + "</td>" +
-        "<td>" + (u.is_admin ? "<span class='pill' style='background:" + hexToRgba("#8b5cf6",0.15) + ";color:var(--violet);'>Administrador</span>" : "<span class='pill' style='background:" + hexToRgba("#3b82f6",0.15) + ";color:var(--blue);'>Miembro</span>") + "</td>" +
+        "<td>" + roleCell + "</td>" +
+        "<td>" + estadoCell + "</td>" +
+        "<td style='text-align:left;color:var(--text-muted)'>" + escapeHtml(lastSeenTxt) + "</td>" +
         "<td style='text-align:left;color:var(--text-muted)'>" + fmtDate((u.added_at||"").slice(0,10)) + "</td>" +
-        "<td>" + delBtn + "</td>" +
+        "<td style='white-space:nowrap'>" + actions + "</td>" +
       "</tr>";
     }).join("");
-    els.usersTable.innerHTML = head + (rows || "<tr><td colspan='5' style='text-align:center;color:var(--text-dim);padding:18px;'>Sin usuarios registrados.</td></tr>");
-    els.usersTable.querySelectorAll(".users-del").forEach(function(btn){
-      btn.addEventListener("click", function(){
-        var email = btn.getAttribute("data-email");
-        if(!confirm("¿Quitar el acceso de " + email + "? Ya no podrá entrar al tablero.")) return;
-        supa.from("allowed_users").delete().eq("email", email)
+    els.usersTable.innerHTML = head + (rows || "<tr><td colspan='7' style='text-align:center;color:var(--text-dim);padding:18px;'>Sin usuarios registrados.</td></tr>");
+
+    els.usersTable.querySelectorAll(".users-role").forEach(function(sel){
+      sel.addEventListener("change", function(){
+        var email = sel.getAttribute("data-email");
+        var newRole = sel.value;
+        supa.from("allowed_users").update({ role: newRole }).eq("email", email)
           .then(function(res){
             if(res.error) throw res.error;
-            showToast("Acceso de " + email + " revocado.");
-            logActivity("Quitó el acceso de " + email);
+            showToast("Rol de " + email + " actualizado a " + ROLE_LABELS[newRole] + ".");
+            logActivity("Cambió el rol de " + email + " a " + ROLE_LABELS[newRole]);
             renderUsersActivity();
           })
           .catch(function(err){
-            showToast("No se pudo quitar el acceso: " + (err.message||"error desconocido"));
+            showToast("No se pudo cambiar el rol: " + (err.message||"error desconocido"));
+            renderUsersActivity();
+          });
+      });
+    });
+
+    els.usersTable.querySelectorAll(".users-toggle-active").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        var email = btn.getAttribute("data-email");
+        var wasActive = btn.getAttribute("data-active") === "1";
+        var newActive = !wasActive;
+        if(!newActive && !confirm("¿Desactivar a " + email + "? Pierde acceso de inmediato — puedes reactivarlo cuando quieras.")) return;
+        supa.from("allowed_users").update({ active: newActive }).eq("email", email)
+          .then(function(res){
+            if(res.error) throw res.error;
+            showToast((newActive?"Reactivado: ":"Desactivado: ") + email);
+            logActivity((newActive?"Reactivó a ":"Desactivó a ") + email);
+            renderUsersActivity();
+          })
+          .catch(function(err){
+            showToast("No se pudo actualizar: " + (err.message||"error desconocido"));
+          });
+      });
+    });
+
+    els.usersTable.querySelectorAll(".users-del").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        var email = btn.getAttribute("data-email");
+        if(!confirm("¿Eliminar definitivamente a " + email + " de la lista de acceso?\n\nSi solo quieres suspenderlo temporalmente, usa \"Desactivar\" en vez de esto.")) return;
+        supa.from("allowed_users").delete().eq("email", email)
+          .then(function(res){
+            if(res.error) throw res.error;
+            showToast("Usuario " + email + " eliminado.");
+            logActivity("Eliminó a " + email);
+            renderUsersActivity();
+          })
+          .catch(function(err){
+            showToast("No se pudo eliminar: " + (err.message||"error desconocido"));
           });
       });
     });
@@ -1517,11 +1615,13 @@
     if(!email || !email.trim()) return;
     email = email.trim().toLowerCase();
     var nombre = prompt("Nombre para mostrar (opcional):") || "";
-    supa.from("allowed_users").insert({ email: email, nombre: nombre.trim(), is_admin: false })
+    var roleInput = (prompt("Rol — escribe exactamente uno:\n\"editor\" = puede ver y editar\n\"viewer\" = solo puede ver\n\"admin\" = administrador\n\n(deja vacío para \"editor\")") || "editor").trim().toLowerCase();
+    if(["admin","editor","viewer"].indexOf(roleInput) === -1) roleInput = "editor";
+    supa.from("allowed_users").insert({ email: email, nombre: nombre.trim(), role: roleInput })
       .then(function(res){
         if(res.error) throw res.error;
-        showToast("Correo " + email + " dado de alta. Recuerda crearle su cuenta en Supabase → Authentication → Users.");
-        logActivity("Dio de alta a " + email);
+        showToast("Correo " + email + " dado de alta como " + ROLE_LABELS[roleInput] + ". Recuerda crearle su cuenta en Supabase → Authentication → Users.");
+        logActivity("Dio de alta a " + email + " (" + ROLE_LABELS[roleInput] + ")");
         renderUsersActivity();
       })
       .catch(function(err){
@@ -1561,6 +1661,21 @@
   /* ---------- Auth (acceso restringido a la familia — solo activo si Supabase está configurado) ---------- */
   var currentUser = null;
   var currentUserIsAdmin = false;
+  var currentUserRole = "editor";
+  var hasLoggedLogin = false;
+
+  function isReadOnly(){ return currentUserRole === "viewer"; }
+
+  function updateReadonlyBanner(){
+    if(els.readonlyBanner) els.readonlyBanner.style.display = isReadOnly() ? "block" : "none";
+  }
+
+  function applyReadOnlyUI(){
+    var ro = isReadOnly();
+    [els.btnUpdate, document.getElementById("btnSgNuevoMov"), document.getElementById("btnDpAddRubro"), document.getElementById("btnAddRow")].forEach(function(btn){
+      if(btn) btn.disabled = ro;
+    });
+  }
 
   function showAuthScreen(){
     els.appRoot.style.display = "none";
@@ -1577,12 +1692,22 @@
     els.btnLogout.style.display = "inline-flex";
     els.footerUserLabel.textContent = (currentUser && currentUser.email) || "Familia López / Ho";
     if(supa && currentUser){
-      supa.from("allowed_users").select("is_admin").eq("email", currentUser.email).maybeSingle()
+      supa.from("allowed_users").select("role,active").eq("email", currentUser.email).maybeSingle()
         .then(function(res){
-          currentUserIsAdmin = !!(res.data && res.data.is_admin);
+          if(res.error) throw res.error;
+          if(!res.data || res.data.active === false){
+            showToast("Tu cuenta fue desactivada. Contacta a un administrador.");
+            supa.auth.signOut();
+            return;
+          }
+          currentUserRole = res.data.role || "editor";
+          currentUserIsAdmin = currentUserRole === "admin";
+          updateReadonlyBanner();
+          applyReadOnlyUI();
+          if(!hasLoggedLogin){ hasLoggedLogin = true; logActivity("Inició sesión"); }
           if(currentPage === "users") renderUsersActivity();
         })
-        .catch(function(){ currentUserIsAdmin = false; });
+        .catch(function(err){ console.error("allowed_users self-check error:", err); currentUserIsAdmin = false; });
     }
     if(!backup) initialLoad();
   }
@@ -1604,6 +1729,10 @@
         onAuthed(session);
       }else if(event === "SIGNED_OUT"){
         currentUser = null;
+        currentUserIsAdmin = false;
+        currentUserRole = "editor";
+        hasLoggedLogin = false;
+        updateReadonlyBanner();
         backup = null;
         if(supaChannel){ supa.removeChannel(supaChannel); supaChannel = null; }
         els.dashboard.style.display = "none";
@@ -1637,10 +1766,53 @@
     });
   });
 
+  els.authForgotBtn.addEventListener("click", function(){
+    if(!supa) return;
+    els.authError.style.display = "none";
+    els.authInfo.style.display = "none";
+    var email = els.authEmail.value.trim();
+    if(!email){
+      els.authError.textContent = "Escribe tu correo arriba primero, luego haz clic en \"¿Olvidaste tu contraseña?\".";
+      els.authError.style.display = "block";
+      return;
+    }
+    supa.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + window.location.pathname })
+      .then(function(res){
+        if(res.error) throw res.error;
+        els.authInfo.textContent = "Si " + email + " tiene una cuenta, te enviamos un correo con instrucciones para restablecer tu contraseña.";
+        els.authInfo.style.display = "block";
+      })
+      .catch(function(err){
+        els.authError.textContent = "No se pudo enviar el correo: " + (err.message||"error desconocido");
+        els.authError.style.display = "block";
+      });
+  });
+
   els.btnLogout.addEventListener("click", function(){
     if(!supa) return;
     if(!confirm("¿Cerrar sesión?")) return;
     supa.auth.signOut();
+  });
+
+  els.btnChangeMyPassword.addEventListener("click", function(){
+    if(!supa || !currentUser) return;
+    var p1 = els.myNewPassword.value;
+    var p2 = els.myNewPassword2.value;
+    if(!p1 || p1.length < 6){ showToast("La contraseña debe tener al menos 6 caracteres."); return; }
+    if(p1 !== p2){ showToast("Las contraseñas no coinciden."); return; }
+    els.btnChangeMyPassword.disabled = true;
+    supa.auth.updateUser({ password: p1 })
+      .then(function(res){
+        els.btnChangeMyPassword.disabled = false;
+        if(res.error) throw res.error;
+        els.myNewPassword.value = ""; els.myNewPassword2.value = "";
+        showToast("Contraseña actualizada.");
+        logActivity("Cambió su propia contraseña");
+      })
+      .catch(function(err){
+        els.btnChangeMyPassword.disabled = false;
+        showToast("No se pudo cambiar la contraseña: " + (err.message||"error desconocido"));
+      });
   });
 
   /* ---------- loading ---------- */
@@ -4025,6 +4197,11 @@
 
   /* ---------- saving ---------- */
   function setDirty(v){
+    if(v && isReadOnly()){
+      showToast("Modo solo lectura — este cambio no se guardó.");
+      updateStatusPill();
+      return;
+    }
     dirty = v;
     updateStatusPill();
     if(v && supa) supaPushDebounced();
