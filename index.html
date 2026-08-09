@@ -280,8 +280,10 @@
   table.matrix td:first-child{text-align:left;font-weight:600;position:sticky;left:0;background:var(--panel);}
   table.matrix tr.matrix-total td{font-weight:800;background:var(--panel-header);}
   table.matrix tr.matrix-capital td{color:var(--violet);background:rgba(139,92,246,.06);}
+  table.matrix tr.matrix-cargo td{color:var(--red);background:rgba(239,68,68,.06);}
   table.matrix tr.matrix-total td:first-child{background:var(--panel-header);}
   table.matrix tr.matrix-capital td:first-child{background:rgba(139,92,246,.06);}
+  table.matrix tr.matrix-cargo td:first-child{background:rgba(239,68,68,.06);}
   table.matrix tr.matrix-flujo-total td{font-weight:800;background:#0a3327;color:#6ee7b7;}
   .dp-input{width:90px;border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-size:12px;
     font-family:inherit;background:var(--panel-2);color:var(--text);text-align:right;}
@@ -2625,7 +2627,7 @@
       var fila = cargosPorTipo[ti];
       var totalTipo = fila.reduce(function(s,v){return s+v;},0);
       totalAnualCargosTotal += totalTipo;
-      var r = "<tr class='matrix-capital' style='color:var(--red)'><td style='padding-left:18px'>↳ " + escapeHtml(tipo.label) + "</td>";
+      var r = "<tr class='matrix-cargo'><td style='padding-left:18px'>↳ " + escapeHtml(tipo.label) + "</td>";
       for(var mi2=0; mi2<12; mi2++){
         totCargosGeneral[mi2] += fila[mi2];
         r += "<td>" + (fila[mi2]>0 ? "−"+fmtMoney(fila[mi2]) : "—") + "</td>";
@@ -2633,7 +2635,7 @@
       r += "<td style='color:var(--red)'>" + (totalTipo>0?"−"+fmtMoney(totalTipo):"—") + "</td></tr>";
       cargoRows += r;
     });
-    var totCargosRow = "<tr class='matrix-capital' style='font-weight:800;color:var(--red)'><td>TOTAL COSTOS Y GASTOS</td>";
+    var totCargosRow = "<tr class='matrix-cargo' style='font-weight:800'><td>TOTAL COSTOS Y GASTOS</td>";
     for(var mi3=0; mi3<12; mi3++){ totCargosRow += "<td>" + (totCargosGeneral[mi3]>0?"−"+fmtMoney(totCargosGeneral[mi3]):"—") + "</td>"; }
     totCargosRow += "<td style='color:var(--red)'>−" + fmtMoney(totalAnualCargosTotal) + "</td></tr>";
 
