@@ -2477,6 +2477,18 @@
     var dias = (Date.now() - new Date(bono.agregadoEl).getTime()) / (1000*60*60*24);
     return dias >= 0 && dias <= 7;
   }
+  // total de cupones por mes: usa el "ing" real del historial cuando ya existe ese periodo (incluye cupones de
+  // bonos ya vencidos o no rastreados individualmente, que sí fueron dinero real recibido ese mes), y solo cuando
+  // no hay dato real todavía cae al estimado sumando el flujo de los bonos activos — así el Historial y la
+  // Proyección siempre cuadran para los meses ya cargados
+  function computeSwlCuponesPorMes(bonosActivos, hist, periodosISO){
+    var histByPer = {};
+    (hist||[]).forEach(function(h){ histByPer[h.per] = h; });
+    return periodosISO.map(function(iso, mi){
+      if(iso && histByPer[iso]) return histByPer[iso].ing || 0;
+      return bonosActivos.reduce(function(s,b){ return s + ((b.flujo && b.flujo[mi]) || 0); }, 0);
+    });
+  }
   // suma los cargos recurrentes reales del historial (bonosLocalesHistorial[per].cargosLineas), clasificados por
   // tipo, en cada una de las 12 columnas de la proyección — devuelve una matriz [tipoIdx][mesIdx]
   function computeSwlCargosPorTipo(hist, periodosISO){
@@ -2503,7 +2515,8 @@
     var hist = backup.state.bonosLocalesHistorial || [];
     var periodosISO = swlMesesISO(meses);
     var totalValor = bonos.reduce(function(s,b){ return s+(b.valor||0); },0);
-    var flujoAnual = bonos.reduce(function(s,b){ return s + (b.flujo||[]).reduce(function(a,v){return a+v;},0); },0);
+    var cuponesPorMes = computeSwlCuponesPorMes(bonos, hist, periodosISO);
+    var flujoAnual = cuponesPorMes.reduce(function(s,v){ return s+v; }, 0);
     var rentAnual = totalValor ? (flujoAnual/totalValor*100) : 0;
 
     var tirResults = bonos.map(function(b){ return computeBondTir(b); }).filter(Boolean);
@@ -2525,7 +2538,7 @@
       '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">RENDIMIENTO NETO ANUAL</div><div class="value" style="color:var(--emerald)">' + (totalValor ? (flujoNetoAnual/totalValor*100).toFixed(2)+'%' : '—') + '</div><div class="foot">Flujo neto / capital en bonos — lo que realmente rinde después de todos los costos</div></div>';
 
     buildSwlBonosTab(bonos, bonosPagados, totalValor);
-    buildSwlFlujoTab(bonos, meses, hist, totalValor, periodosISO, cargosPorTipo);
+    buildSwlFlujoTab(bonos, meses, hist, totalValor, periodosISO, cargosPorTipo, cuponesPorMes);
     buildSwlHistorialTab(hist);
     buildSwlCostosTab(bonos);
   }
@@ -2577,16 +2590,18 @@
     els.swlBonosTable.innerHTML = head + rows + rowsPagados + total;
   }
 
-  function buildSwlFlujoTab(bonos, meses, hist, totalValor, periodosISO, cargosPorTipo){
+  function buildSwlFlujoTab(bonos, meses, hist, totalValor, periodosISO, cargosPorTipo, cuponesPorMes){
     var mesesEtiquetas = swlMesesConAnio(meses);
-    var head = "<tr><th style='text-align:left'>Instrumento</th>" + mesesEtiquetas.map(function(m){ return "<th>"+escapeHtml(m)+"</th>"; }).join("") + "<th>Anual</th></tr>";
-    var totMes = new Array(12).fill(0), totCapital = new Array(12).fill(0), rows = "";
+    var histByPer = {};
+    (hist||[]).forEach(function(h){ histByPer[h.per] = h; });
+    var head = "<tr><th style='text-align:left'>Instrumento</th>" + mesesEtiquetas.map(function(m,mi){ return "<th>"+escapeHtml(m)+(periodosISO[mi] && histByPer[periodosISO[mi]] ? " <span title='dato real del historial' style='color:var(--emerald);'>✓</span>" : "")+"</th>"; }).join("") + "<th>Anual</th></tr>";
+    var totCapital = new Array(12).fill(0), rows = "";
     bonos.forEach(function(b){
       var anual = 0;
       var esNuevo = swlEsCompraReciente(b);
       var cupRow = "<tr" + (esNuevo ? " style='background:" + hexToRgba("#f59e0b",0.12) + "'" : "") + "><td>" + escapeHtml(b.nombre.split(" ").slice(0,2).join(" ")) + (esNuevo ? " <span style='font-size:9px;background:var(--amber);color:#1a1200;padding:1px 5px;border-radius:8px;font-weight:800;'>NUEVO</span>" : "") + " <span style='font-size:9px;color:var(--text-dim)'>" + escapeHtml(b.codigo) + "</span></td>";
       (b.flujo||[]).forEach(function(v, mi){
-        anual += v; totMes[mi] += v;
+        anual += v;
         cupRow += "<td style='color:" + (v>0?"var(--emerald)":"var(--text-dim)") + "'>" + (v>0 ? "$"+v.toFixed(2) : "—") + "</td>";
       });
       cupRow += "<td style='color:var(--emerald);font-weight:700'>" + fmtMoney(anual) + "</td></tr>";
@@ -2609,10 +2624,10 @@
         totFlujoRow = "<tr class='matrix-flujo-total'><td>FLUJO TOTAL (bruto)</td>";
     var totalAnualCup = 0, totalAnualCap = 0;
     for(var mi=0; mi<12; mi++){
-      totalAnualCup += totMes[mi]; totalAnualCap += totCapital[mi];
-      totCupRow += "<td>" + (totMes[mi]>0?fmtMoney(totMes[mi]):"—") + "</td>";
+      totalAnualCup += cuponesPorMes[mi]; totalAnualCap += totCapital[mi];
+      totCupRow += "<td>" + (cuponesPorMes[mi]>0?fmtMoney(cuponesPorMes[mi]):"—") + "</td>";
       totCapRow += "<td>" + (totCapital[mi]>0?fmtMoney(totCapital[mi]):"—") + "</td>";
-      var ft = totMes[mi] + totCapital[mi];
+      var ft = cuponesPorMes[mi] + totCapital[mi];
       totFlujoRow += "<td>" + (ft>0?fmtMoney(ft):"—") + "</td>";
     }
     totCupRow += "<td>" + fmtMoney(totalAnualCup) + "</td></tr>";
@@ -2642,9 +2657,9 @@
     var capitalRestanteRow = "<tr style='color:var(--blue);font-weight:700'><td>CAPITAL NETO RESTANTE</td>";
     var capitalRestante = totalValor, totalAnualNeto = 0;
     for(var mi4=0; mi4<12; mi4++){
-      var ft2 = totMes[mi4] + totCapital[mi4];
+      var ft2 = cuponesPorMes[mi4] + totCapital[mi4];
       var neto = ft2 - totCargosGeneral[mi4];
-      totalAnualNeto += (totMes[mi4] - totCargosGeneral[mi4]); // el neto anual de RENDIMIENTO no incluye devolución de capital, solo cupones - costos
+      totalAnualNeto += (cuponesPorMes[mi4] - totCargosGeneral[mi4]); // el neto anual de RENDIMIENTO no incluye devolución de capital, solo cupones - costos
       netoRow += "<td>" + (neto!==0?fmtMoney(neto):"—") + "</td>";
       capitalRestante -= totCapital[mi4];
       capitalRestanteRow += "<td>" + (totCapital[mi4]>0 ? fmtMoney(capitalRestante) : "—") + "</td>";
