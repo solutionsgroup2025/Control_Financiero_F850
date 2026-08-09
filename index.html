@@ -2474,20 +2474,34 @@
     return conCargo.length ? conCargo[0].car : 0;
   }
 
+  // frecuencia de pago legible, inferida del número de meses con cupón en el flujo cargado
+  function frecuenciaLabel(freq){
+    if(!freq) return "—";
+    if(freq >= 10) return "Mensual";
+    if(freq === 6) return "Bimestral";
+    if(freq === 4) return "Trimestral";
+    if(freq === 3) return "Cuatrimestral";
+    if(freq === 2) return "Semestral";
+    if(freq === 1) return "Anual";
+    return freq + "x/año";
+  }
+
   function buildSwlBonosTab(bonos, totalValor){
-    var head = "<tr><th style='text-align:left'>Instrumento</th><th>Valor</th><th>Tasa</th><th>Vencimiento</th><th>Próximo Cupón</th><th>Monto Próximo</th></tr>";
+    var head = "<tr><th style='text-align:left'>Instrumento</th><th>Valor</th><th>Tasa</th><th>Frecuencia</th><th>Vencimiento</th><th>Próximo Cupón</th><th>Monto Próximo</th></tr>";
     var rows = bonos.map(function(b){
       var alertMark = b.alerta ? ' ⚠️' : '';
+      var sched = inferCouponSchedule(b);
       return "<tr" + (b.alerta ? " class='row-alert'" : "") + ">" +
         "<td><div style='font-weight:700;" + (b.alerta?"color:var(--red)":"") + "'>" + escapeHtml(b.nombre) + alertMark + "</div><div style='font-size:10px;color:var(--text-dim)'>" + escapeHtml(b.codigo) + "</div></td>" +
         "<td>" + fmtMoney(b.valor) + "</td>" +
         "<td style='color:var(--blue);font-weight:600'>" + escapeHtml(b.tasa) + "</td>" +
+        "<td style='color:var(--violet)'>" + frecuenciaLabel(sched && sched.freq) + "</td>" +
         "<td>" + escapeHtml(b.vencimiento) + "</td>" +
         "<td style='color:" + (b.alerta?"var(--red)":"var(--amber)") + "'>" + escapeHtml(b.proximoCupon) + "</td>" +
         "<td style='color:var(--emerald);font-weight:700'>" + fmtMoney(b.montoProximo) + "</td>" +
       "</tr>";
     }).join("");
-    var total = "<tr class='matrix-total'><td>TOTAL</td><td>" + fmtMoney(totalValor) + "</td><td colspan='4'></td></tr>";
+    var total = "<tr class='matrix-total'><td>TOTAL</td><td>" + fmtMoney(totalValor) + "</td><td colspan='5'></td></tr>";
     els.swlBonosTable.innerHTML = head + rows + total;
   }
 
@@ -2566,7 +2580,11 @@
     var filtered = hist.filter(function(h){ return h.per.slice(0,4) === swlHistYear; });
     var head = "<tr><th style='text-align:left'>Periodo</th><th>Total</th><th>Ingresos</th><th>Cargos</th></tr>";
     var rows = filtered.slice().sort(function(a,b){ return a.per<b.per?1:-1; }).map(function(h){
-      return "<tr><td>" + escapeHtml(h.per) + "</td><td>" + fmtMoney(h.total) + "</td>" +
+      var detLines = [];
+      (h.ingresosLineas||[]).forEach(function(l){ if(l.monto) detLines.push("<div style='color:var(--emerald)'>+" + fmtMoney(l.monto) + " " + escapeHtml(l.descripcion||"Ingreso") + "</div>"); });
+      (h.cargosLineas||[]).forEach(function(l){ if(l.monto) detLines.push("<div style='color:var(--red)'>−" + fmtMoney(Math.abs(l.monto)) + " " + escapeHtml(l.descripcion||"Cargo") + "</div>"); });
+      var detHtml = detLines.length ? "<div style='font-size:10px;margin-top:4px;line-height:1.6;'>" + detLines.join("") + "</div>" : "";
+      return "<tr><td>" + escapeHtml(h.per) + detHtml + "</td><td>" + fmtMoney(h.total) + "</td>" +
         "<td style='color:var(--emerald)'>" + (h.ing>0?fmtMoney(h.ing):"—") + "</td>" +
         "<td style='color:" + (h.car>0?"var(--red)":"var(--text-dim)") + "'>" + (h.car>0?fmtMoney(h.car):"—") + "</td></tr>";
     }).join("");
@@ -3525,7 +3543,9 @@
             "   - blackrock: {\"valorActual\":0,\"precioAccion\":0,\"acciones\":0,\"gpNoReal\":0} (valor/precio/acciones de la POSICIÓN de BlackRock en la tabla de holdings — NO pongas aquí la distribución, esa va en el campo \"distribucionBlackRock\" del nivel superior)\n" +
             "IMPORTANTE: si alguna sección no aparece en el documento, omítela o déjala como arreglo/objeto vacío — NO inventes posiciones, cargos ni cifras que no estén literalmente en el texto. Responde SOLO con el JSON, sin texto adicional."
           + "\n\nEjemplo del formato de respuesta esperado (con datos de ejemplo, no los copies):\n{\"periodo\":\"2026-05\",\"total\":222218.47,\"distribucionBlackRock\":665.36,\"ingresos\":704.13,\"cargos\":64.50,\"depositos\":0,\"composicion\":{},\"ingresosLineas\":[{\"descripcion\":\"Fondos Money Market\",\"monto\":20.38},{\"descripcion\":\"Intereses de Bonos\",\"monto\":683.75}],\"cargosLineas\":[{\"descripcion\":\"Foreign Custody Fee\",\"monto\":2.00},{\"descripcion\":\"Administration Fee\",\"monto\":62.50}],\"posiciones\":{}}"
-          : "Este es el texto extraído de un estado de cuenta financiero:\n\n" + pdfPreviewText + "\n\nExtrae: periodo (formato YYYY-MM), saldo/valor total del periodo, ingresos/cupones/réditos/canon del periodo, y cargos/comisiones del periodo. Responde SOLO con JSON: {\"periodo\":\"YYYY-MM\",\"total\":0,\"ingresos\":0,\"cargos\":0}";
+          : "Este es el texto extraído de un estado de cuenta financiero:\n\n" + pdfPreviewText + "\n\nExtrae: periodo (formato YYYY-MM), saldo/valor total del periodo, ingresos/cupones/réditos/canon del periodo, y cargos/comisiones del periodo. " +
+            "Además, si el documento trae detalle línea por línea de transacciones (ej. \"Cupón X\", \"COMISION\", \"ITBMS\", \"INTERES ACUMULADO\", cargos de custodia/manejo, etc.), inclúyelo en ingresosLineas y cargosLineas como arreglos de {\"descripcion\":\"...\",\"monto\":0} — una línea por cada transacción individual del período, con su descripción literal (ej. \"Cupón ALUT0875000527W\", \"Comisión compra\", \"ITBMS 7%\"). Si no hay detalle línea por línea disponible, omite estos dos campos. " +
+            "Responde SOLO con JSON: {\"periodo\":\"YYYY-MM\",\"total\":0,\"ingresos\":0,\"cargos\":0,\"ingresosLineas\":[{\"descripcion\":\"...\",\"monto\":0}],\"cargosLineas\":[{\"descripcion\":\"...\",\"monto\":0}]}";
         return fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
           headers: {
@@ -3609,8 +3629,14 @@
     if(t.kind === "historial"){
       var hist = backup.state.bonosLocalesHistorial || (backup.state.bonosLocalesHistorial = []);
       var existing = hist.find(function(h){ return h.per === per; });
-      if(existing){ existing.total = valorTotal!=null?valorTotal:existing.total; existing.ing = ingresos; existing.car = cargos; }
-      else hist.push({ per:per, total: valorTotal||0, ing:ingresos, car:cargos });
+      var entryH = existing || { per:per, total: 0, ing:0, car:0 };
+      entryH.total = valorTotal!=null?valorTotal:entryH.total; entryH.ing = ingresos; entryH.car = cargos;
+      // desglose línea por línea (cupones individuales, comisiones, ITBMS, interés acumulado, etc.), si el documento lo trae
+      if(pendingPershingCashDetail){
+        if((pendingPershingCashDetail.ingresosLineas||[]).length) entryH.ingresosLineas = pendingPershingCashDetail.ingresosLineas;
+        if((pendingPershingCashDetail.cargosLineas||[]).length) entryH.cargosLineas = pendingPershingCashDetail.cargosLineas;
+      }
+      if(!existing) hist.push(entryH);
       var acc = findInv(t.investmentId);
       if(acc){ if(valorTotal!=null) acc.value = valorTotal; acc.flujoMensual = { per:per, ing:ingresos, car:cargos }; }
     }
