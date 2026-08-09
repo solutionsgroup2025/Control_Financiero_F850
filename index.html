@@ -3328,7 +3328,10 @@
         if(text.length < 20){
           throw new Error("Este PDF no parece tener texto legible (podría ser una imagen escaneada). Prueba con un PDF generado digitalmente, o usa CSV/JSON.");
         }
-        pdfPreviewText = text.length > 20000 ? text.slice(0,20000) : text;
+        // límite generoso: los estados de cuenta de Pershing/SweetWater suelen tener 15-20 páginas y la sección de
+        // BlackRock (Transacciones por Tipo de Actividad) cae típicamente en la página 9, ~pasado el carácter 26,000 —
+        // un límite de 20,000 la cortaba silenciosamente. Sonnet soporta muchísimo más contexto que esto.
+        pdfPreviewText = text.length > 120000 ? text.slice(0,120000) : text;
         els.importStatus.textContent = "Interpretando " + file.name + " con IA…";
         var isPershing = els.importTarget.value === "sw-pershing";
         var promptText = isPershing
