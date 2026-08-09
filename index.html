@@ -2530,6 +2530,9 @@
   var SWP_COLORS = { alternativos:"#8b5cf6", fondos:"#10b981", bonos:"#3b82f6", etf:"#f59e0b", efectivo:"#7c93ad" };
   var SWP_LABELS = { alternativos:"Alternativos", fondos:"Fondos Mutuos", bonos:"Renta Fija", etf:"ETFs", efectivo:"Efectivo" };
   var SWP_ORDER = ["alternativos","fondos","bonos","etf","efectivo"];
+  // mapas de claves fijas, solo para renderizar meses ya guardados con el formato antiguo (previo al rediseño de líneas flexibles)
+  var SWP_INGRESO_LABELS_LEGACY = { efectivoMM:"Dividendos / Intereses (efectivo MM)", distribucionesAlternativos:"Distribuciones de alternativos (BlackRock, etc.)", otros:"Otros ingresos" };
+  var SWP_CARGO_LABELS_LEGACY = { comisionProductoEspecial:"Comisión producto especial", custodiaExtranjera:"Custodia extranjera", cuentaNoUS:"Cuenta no-US", asesoriaGestion:"Asesoría / gestión de activos", otros:"Otros cargos" };
 
   function periodLabel(per){
     var mn=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
@@ -2705,20 +2708,26 @@
     resumenLine += ' + ' + fmtMoney(d.ing) + ' ingresos − ' + fmtMoney(d.car) + ' cargos ' + (chg>=0?'+':'−') + ' ' + fmtMoney(Math.abs(chg)) + ' cambio mercado = ' + fmtMoney(d.total) + ' final';
     compHtml += '<div class="sr" style="border-top:1px solid var(--border);margin-top:6px;padding-top:12px;font-size:11.5px;color:var(--text-dim);"><span>' + resumenLine + '</span></div>';
 
-    if(d.ingresosDetalle || d.cargosDetalle){
-      var detLines = [];
-      if(d.ingresosDetalle){
-        Object.keys(SWP_INGRESO_LABELS).forEach(function(k){ if(d.ingresosDetalle[k]) detLines.push('<div class="sr"><span class="lbl" style="padding-left:10px;">↳ ' + SWP_INGRESO_LABELS[k] + '</span><span class="val" style="color:var(--emerald);font-size:12px;">+' + fmtMoney(d.ingresosDetalle[k]) + '</span></div>'); });
-      }
-      if(d.cargosDetalle){
-        Object.keys(SWP_CARGO_LABELS).forEach(function(k){ if(d.cargosDetalle[k]) detLines.push('<div class="sr"><span class="lbl" style="padding-left:10px;">↳ ' + SWP_CARGO_LABELS[k] + '</span><span class="val" style="color:var(--red);font-size:12px;">−' + fmtMoney(d.cargosDetalle[k]) + '</span></div>'); });
-      }
-      if(d.interesDevengadoRentaFija){
-        detLines.push('<div class="sr"><span class="lbl" style="padding-left:10px;">↳ Interés devengado en bonos (no es efectivo)</span><span class="val" style="color:var(--amber);font-size:12px;">' + fmtMoney(d.interesDevengadoRentaFija) + '</span></div>');
-      }
-      if(detLines.length){
-        compHtml += '<div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);"><div style="font-size:11px;color:var(--text-dim);font-weight:700;margin-bottom:4px;">DESGLOSE POR FUENTE / TIPO</div>' + detLines.join("") + '</div>';
-      }
+    var detLines = [];
+    if(d.distribucionBlackRock != null){
+      detLines.push('<div class="sr"><span class="lbl" style="padding-left:10px;">↳ Distribución BlackRock</span><span class="val" style="color:var(--violet);font-size:12px;font-weight:700;">+' + fmtMoney(d.distribucionBlackRock) + '</span></div>');
+    }
+    if(d.ingresosLineas && d.ingresosLineas.length){
+      d.ingresosLineas.forEach(function(l){ if(l.monto) detLines.push('<div class="sr"><span class="lbl" style="padding-left:10px;">↳ ' + escapeHtml(l.descripcion||"Ingreso") + '</span><span class="val" style="color:var(--emerald);font-size:12px;">+' + fmtMoney(l.monto) + '</span></div>'); });
+    } else if(d.ingresosDetalle){
+      // formato antiguo (meses cargados antes del rediseño del desglose) — se conserva para no perder el historial ya guardado
+      Object.keys(SWP_INGRESO_LABELS_LEGACY).forEach(function(k){ if(d.ingresosDetalle[k]) detLines.push('<div class="sr"><span class="lbl" style="padding-left:10px;">↳ ' + SWP_INGRESO_LABELS_LEGACY[k] + '</span><span class="val" style="color:var(--emerald);font-size:12px;">+' + fmtMoney(d.ingresosDetalle[k]) + '</span></div>'); });
+    }
+    if(d.cargosLineas && d.cargosLineas.length){
+      d.cargosLineas.forEach(function(l){ if(l.monto) detLines.push('<div class="sr"><span class="lbl" style="padding-left:10px;">↳ ' + escapeHtml(l.descripcion||"Cargo") + '</span><span class="val" style="color:var(--red);font-size:12px;">−' + fmtMoney(Math.abs(l.monto)) + '</span></div>'); });
+    } else if(d.cargosDetalle){
+      Object.keys(SWP_CARGO_LABELS_LEGACY).forEach(function(k){ if(d.cargosDetalle[k]) detLines.push('<div class="sr"><span class="lbl" style="padding-left:10px;">↳ ' + SWP_CARGO_LABELS_LEGACY[k] + '</span><span class="val" style="color:var(--red);font-size:12px;">−' + fmtMoney(d.cargosDetalle[k]) + '</span></div>'); });
+    }
+    if(d.interesDevengadoRentaFija){
+      detLines.push('<div class="sr"><span class="lbl" style="padding-left:10px;">↳ Interés devengado en bonos (no es efectivo)</span><span class="val" style="color:var(--amber);font-size:12px;">' + fmtMoney(d.interesDevengadoRentaFija) + '</span></div>');
+    }
+    if(detLines.length){
+      compHtml += '<div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);"><div style="font-size:11px;color:var(--text-dim);font-weight:700;margin-bottom:4px;">DESGLOSE POR FUENTE / TIPO</div>' + detLines.join("") + '</div>';
     }
     els.swpComparacion.innerHTML = compHtml;
 
@@ -3214,14 +3223,17 @@
 
   var pendingPershingPositions = null;
   var pendingPershingCashDetail = null;
-  var SWP_INGRESO_LABELS = { efectivoMM:"Dividendos / Intereses (efectivo MM)", distribucionesAlternativos:"Distribuciones de alternativos (BlackRock, etc.)", otros:"Otros ingresos" };
-  var SWP_CARGO_LABELS = { comisionProductoEspecial:"Comisión producto especial", custodiaExtranjera:"Custodia extranjera", cuentaNoUS:"Cuenta no-US", asesoriaGestion:"Asesoría / gestión de activos", otros:"Otros cargos" };
 
   function prefillReviewForm(obj){
     if(!obj) return;
     if(obj.periodo && /^\d{4}-\d{2}$/.test(obj.periodo)) els.ivPeriodo.value = obj.periodo;
     if(obj.total != null) els.ivValorTotal.value = obj.total;
-    if(obj.ingresos != null) els.ivIngresos.value = obj.ingresos;
+    // "ingresos" (campo del formulario) = ingresos brutos SIN distribución BlackRock + la distribución BlackRock,
+    // combinados, porque así se reconcilia el "Cambio Neto" (ver fórmula en btnApplyIngest). El desglose real
+    // (qué es cada cosa) se guarda aparte en pendingPershingCashDetail para mostrarlo desglosado.
+    if(obj.ingresos != null || obj.distribucionBlackRock != null){
+      els.ivIngresos.value = round2((obj.ingresos||0) + (obj.distribucionBlackRock||0));
+    }
     if(obj.cargos != null) els.ivCargos.value = obj.cargos;
     if(obj.depositos != null && els.ivPershingDepositos) els.ivPershingDepositos.value = obj.depositos;
     if(obj.composicion){
@@ -3239,7 +3251,7 @@
         if((p.fondosMutuos||[]).length) parts.push((p.fondosMutuos.length) + " fondos mutuos");
         if((p.bonosCorp||[]).length) parts.push((p.bonosCorp.length) + " bonos corp.");
         if((p.etfs||[]).length) parts.push((p.etfs.length) + " ETFs");
-        if(p.blackrock && p.blackrock.valorActual != null) parts.push("BlackRock " + fmtMoney(p.blackrock.valorActual));
+        if(p.blackrock && p.blackrock.valorActual != null) parts.push("BlackRock (posición) " + fmtMoney(p.blackrock.valorActual));
         els.ivPershingPosSummary.textContent = parts.length
           ? "✓ Detalle de posiciones detectado: " + parts.join(", ") + " — revisa el JSON de arriba antes de aplicar."
           : "No se detectó tabla de posiciones en este documento (se aplicarán solo los totales).";
@@ -3248,17 +3260,28 @@
       }
     }
 
-    pendingPershingCashDetail = (obj.ingresosDetalle || obj.cargosDetalle) ? { ingresosDetalle: obj.ingresosDetalle||{}, cargosDetalle: obj.cargosDetalle||{}, interesDevengadoRentaFija: obj.interesDevengadoRentaFija } : null;
+    var hasCashDetail = (obj.ingresosLineas && obj.ingresosLineas.length) || (obj.cargosLineas && obj.cargosLineas.length) || obj.distribucionBlackRock != null;
+    pendingPershingCashDetail = hasCashDetail ? {
+      ingresosLineas: obj.ingresosLineas || [],
+      cargosLineas: obj.cargosLineas || [],
+      distribucionBlackRock: obj.distribucionBlackRock,
+      interesDevengadoRentaFija: obj.interesDevengadoRentaFija
+    } : null;
     if(els.ivPershingCashDetail){
       if(pendingPershingCashDetail){
-        var ing = pendingPershingCashDetail.ingresosDetalle, car = pendingPershingCashDetail.cargosDetalle;
         var lines = [];
-        Object.keys(SWP_INGRESO_LABELS).forEach(function(k){ if(ing[k]) lines.push("<span style='color:var(--emerald)'>+" + fmtMoney(ing[k]) + "</span> " + SWP_INGRESO_LABELS[k]); });
-        Object.keys(SWP_CARGO_LABELS).forEach(function(k){ if(car[k]) lines.push("<span style='color:var(--red)'>−" + fmtMoney(car[k]) + "</span> " + SWP_CARGO_LABELS[k]); });
+        if(pendingPershingCashDetail.distribucionBlackRock != null){
+          lines.push("<span style='color:var(--violet);font-weight:700;'>+" + fmtMoney(pendingPershingCashDetail.distribucionBlackRock) + "</span> Distribución BlackRock (Total de Distribuciones)");
+        }
+        pendingPershingCashDetail.ingresosLineas.forEach(function(l){ if(l.monto) lines.push("<span style='color:var(--emerald)'>+" + fmtMoney(l.monto) + "</span> " + escapeHtml(l.descripcion||"Ingreso")); });
+        pendingPershingCashDetail.cargosLineas.forEach(function(l){ if(l.monto) lines.push("<span style='color:var(--red)'>−" + fmtMoney(Math.abs(l.monto)) + "</span> " + escapeHtml(l.descripcion||"Cargo")); });
         if(pendingPershingCashDetail.interesDevengadoRentaFija) lines.push("<span style='color:var(--amber)'>" + fmtMoney(pendingPershingCashDetail.interesDevengadoRentaFija) + "</span> interés devengado en bonos (no es efectivo recibido — solo informativo)");
         els.ivPershingCashDetail.innerHTML = lines.length
-          ? "<div style='color:var(--text-dim);font-size:11.5px;margin-bottom:4px;'>Desglose detectado por fuente/tipo:</div><div style='font-size:12.5px;line-height:1.9;'>" + lines.join("<br>") + "</div>"
+          ? "<div style='color:var(--text-dim);font-size:11.5px;margin-bottom:4px;'>Desglose detectado (revisa contra el PDF antes de aplicar):</div><div style='font-size:12.5px;line-height:1.9;'>" + lines.join("<br>") + "</div>"
           : "";
+        if(pendingPershingCashDetail.distribucionBlackRock == null){
+          els.ivPershingCashDetail.innerHTML += "<div style='color:var(--amber);font-size:12px;margin-top:6px;'>⚠ No se detectó la distribución de BlackRock — revisa el PDF manualmente y avísame el monto si aparece.</div>";
+        }
       } else {
         els.ivPershingCashDetail.innerHTML = "";
       }
@@ -3309,25 +3332,28 @@
         els.importStatus.textContent = "Interpretando " + file.name + " con IA…";
         var isPershing = els.importTarget.value === "sw-pershing";
         var promptText = isPershing
-          ? "Este es el texto extraído de un estado de cuenta de Pershing (multi-activo: fondos mutuos, bonos corporativos, ETFs, y una posición BlackRock):\n\n" + pdfPreviewText +
-            "\n\nExtrae TODO lo siguiente:\n" +
+          ? "Este es el texto extraído de un estado de cuenta de Pershing/SweetWater (multi-activo: fondos mutuos, bonos corporativos, ETFs, y una posición BlackRock Private Credit Fund):\n\n" + pdfPreviewText +
+            "\n\nEl documento típicamente tiene estas secciones — úsalas como guía para ubicar cada dato:\n" +
+            "- \"Transacciones por Tipo de Actividad\": lista movimientos agrupados por tipo (Distribuciones, Cargos, Dividendos, etc.), cada uno con su \"Total de [tipo]\".\n" +
+            "- \"Resumen de Ingresos y Gastos\": tabla con columnas \"Período Actual\" y \"Año hasta la Fecha\" — USA SIEMPRE la columna \"Período Actual\", NUNCA \"Año hasta la Fecha\". Incluye filas como \"Total de ingresos\" y, en su propia sección separada, \"Total de Distribuciones\".\n" +
+            "\nExtrae TODO lo siguiente:\n" +
             "1. periodo (formato YYYY-MM, el mes del corte del estado de cuenta)\n" +
             "2. total: valor total de la cuenta al final del periodo\n" +
-            "3. ingresos: ingresos brutos EN EFECTIVO del periodo (dividendos + intereses de efectivo/money market + distribuciones recibidas — NO incluyas interés devengado no pagado)\n" +
-            "4. cargos: total de cargos/comisiones/tarifas del periodo\n" +
-            "5. depositos: depósitos o aportes NUEVOS de efectivo hechos a la cuenta en el periodo (busca transferencias/ACH/wire entrantes; si no hay, usa 0)\n" +
-            "6. composicion (opcional, si el documento lo muestra por clase de activo): {\"efectivo\":0,\"bonos\":0,\"fondos\":0,\"etf\":0,\"alternativos\":0}\n" +
-            "7. ingresosDetalle: desglose de EXACTAMENTE de dónde viene el efectivo recibido (la suma de estos campos debe ser igual a \"ingresos\"):\n" +
-            "   {\"efectivoMM\":0 (dividendos/intereses del fondo de liquidez o money market), \"distribucionesAlternativos\":0 (distribuciones de BlackRock u otras inversiones alternativas/partnership), \"otros\":0}\n" +
-            "8. cargosDetalle: desglose de EXACTAMENTE cada cargo individual que aparezca en el estado de cuenta (la suma debe ser igual a \"cargos\"), usa estas categorías si aplican y agrega lo que no encaje en \"otros\":\n" +
-            "   {\"comisionProductoEspecial\":0 (special product fee / custodia de inversión alternativa no registrada), \"custodiaExtranjera\":0 (foreign custody fee), \"cuentaNoUS\":0 (non-U.S. account fee), \"asesoriaGestion\":0 (asset based fee / advisory fee), \"otros\":0}\n" +
-            "9. interesDevengadoRentaFija: interés ACUMULADO/DEVENGADO (no pagado en efectivo todavía) de los bonos en cartera, si el documento lo muestra como una cifra separada (esto es informativo, NO se suma a \"ingresos\")\n" +
-            "10. posiciones: el detalle línea por línea de CADA posición individual que encuentres:\n" +
+            "3. distribucionBlackRock: EL DATO MÁS IMPORTANTE — el monto de \"Total de Distribuciones\" (columna Período Actual) en \"Resumen de Ingresos y Gastos\", que debe coincidir con la transacción \"PARTNERSHIP DISTRIBUTION\" relacionada a BLACKROCK en \"Transacciones por Tipo de Actividad\" → \"Distribuciones\" → \"Total de Distribuciones\". Si no encuentras esta sección o no hay distribución este mes, usa 0 — pero BUSCA A FONDO antes de poner 0, este dato casi siempre existe.\n" +
+            "4. ingresos: el monto de \"Total de ingresos\" (columna Período Actual) en \"Resumen de Ingresos y Gastos\" — dividendos + intereses de bonos, SIN incluir distribucionBlackRock (son secciones separadas en el documento)\n" +
+            "5. cargos: total de cargos/comisiones/tarifas del periodo (positivo, ej. si el documento dice \"-$64.50\" reporta 64.50)\n" +
+            "6. depositos: depósitos o aportes NUEVOS de efectivo hechos a la cuenta en el periodo (transferencias/ACH/wire entrantes; si no hay, usa 0)\n" +
+            "7. composicion (opcional, si el documento lo muestra por clase de activo): {\"efectivo\":0,\"bonos\":0,\"fondos\":0,\"etf\":0,\"alternativos\":0}\n" +
+            "8. ingresosLineas: arreglo con CADA línea de \"Resumen de Ingresos y Gastos\" tal como aparece (columna Período Actual), ej: [{\"descripcion\":\"Fondos Money Market\",\"monto\":0},{\"descripcion\":\"Intereses de Bonos\",\"monto\":0}] — no incluyas aquí la distribución de BlackRock, esa va en el campo \"distribucionBlackRock\"\n" +
+            "9. cargosLineas: arreglo con CADA cargo/comisión individual tal como aparece en \"Transacciones por Tipo de Actividad\" → \"Cargos\", con su descripción literal, ej: [{\"descripcion\":\"Foreign Custody Fee\",\"monto\":2.00},{\"descripcion\":\"Administration Fee\",\"monto\":62.50}]\n" +
+            "10. interesDevengadoRentaFija: interés ACUMULADO/DEVENGADO (columna \"Intereses Devengados\" en la tabla de transacciones, no pagado en efectivo todavía) de los bonos, si aparece como cifra separada (informativo, NO se suma a \"ingresos\")\n" +
+            "11. posiciones: el detalle línea por línea de CADA posición individual que encuentres en las tablas de holdings/posiciones (NO en las transacciones):\n" +
             "   - fondosMutuos: [{\"fondo\":\"nombre\",\"cantidad\":0,\"costoUnit\":0,\"baseCosto\":0,\"precioMkt\":0,\"valorMkt\":0,\"gpNoReal\":0}]\n" +
             "   - bonosCorp: [{\"instrumento\":\"nombre\",\"cantidad\":0,\"costoUnit\":0,\"baseCosto\":0,\"precioMkt\":0,\"valorMkt\":0,\"gpNoReal\":0,\"interesDevengado\":0,\"vencimiento\":\"YYYY-MM-DD\",\"cusip\":\"...\"}]\n" +
             "   - etfs: [{\"etf\":\"nombre\",\"acciones\":0,\"costoUnit\":0,\"baseCosto\":0,\"precioMkt\":0,\"valorMkt\":0,\"gpNoReal\":0,\"identificador\":\"...\"}]\n" +
-            "   - blackrock: {\"valorActual\":0,\"precioAccion\":0,\"acciones\":0,\"distribucionMensual\":0,\"gpNoReal\":0} (si aparece esta posición específica). IMPORTANTE: \"distribucionMensual\" normalmente NO está en la tabla de posiciones/holdings, sino en la sección de actividad/ingresos del periodo (busca \"distribution\", \"partnership distribution\" o similar relacionado a BlackRock) — debe ser el MISMO monto que reportes en ingresosDetalle.distribucionesAlternativos si BlackRock es la única inversión alternativa.\n" +
+            "   - blackrock: {\"valorActual\":0,\"precioAccion\":0,\"acciones\":0,\"gpNoReal\":0} (valor/precio/acciones de la POSICIÓN de BlackRock en la tabla de holdings — NO pongas aquí la distribución, esa va en el campo \"distribucionBlackRock\" del nivel superior)\n" +
             "IMPORTANTE: si alguna sección no aparece en el documento, omítela o déjala como arreglo/objeto vacío — NO inventes posiciones, cargos ni cifras que no estén literalmente en el texto. Responde SOLO con el JSON, sin texto adicional."
+          + "\n\nEjemplo del formato de respuesta esperado (con datos de ejemplo, no los copies):\n{\"periodo\":\"2026-05\",\"total\":222218.47,\"distribucionBlackRock\":665.36,\"ingresos\":704.13,\"cargos\":64.50,\"depositos\":0,\"composicion\":{},\"ingresosLineas\":[{\"descripcion\":\"Fondos Money Market\",\"monto\":20.38},{\"descripcion\":\"Intereses de Bonos\",\"monto\":683.75}],\"cargosLineas\":[{\"descripcion\":\"Foreign Custody Fee\",\"monto\":2.00},{\"descripcion\":\"Administration Fee\",\"monto\":62.50}],\"posiciones\":{}}"
           : "Este es el texto extraído de un estado de cuenta financiero:\n\n" + pdfPreviewText + "\n\nExtrae: periodo (formato YYYY-MM), saldo/valor total del periodo, ingresos/cupones/réditos/canon del periodo, y cargos/comisiones del periodo. Responde SOLO con JSON: {\"periodo\":\"YYYY-MM\",\"total\":0,\"ingresos\":0,\"cargos\":0}";
         return fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
@@ -3448,10 +3474,14 @@
         depositos: depositosIn,
         composicion: newComp
       };
-      var distribucionAlternativosFromCash = (pendingPershingCashDetail && pendingPershingCashDetail.ingresosDetalle && pendingPershingCashDetail.ingresosDetalle.distribucionesAlternativos) || null;
+      // distribución BlackRock del mes: viene del campo dedicado del prompt ("Total de Distribuciones" en
+      // Transacciones por Tipo de Actividad). Se captura aquí, antes de limpiar pendingPershingCashDetail,
+      // para alimentar tanto ph[per] como el detalle de posición de BlackRock más abajo.
+      var distribucionBlackRockDelMes = (pendingPershingCashDetail && pendingPershingCashDetail.distribucionBlackRock != null) ? pendingPershingCashDetail.distribucionBlackRock : null;
       if(pendingPershingCashDetail){
-        if(Object.keys(pendingPershingCashDetail.ingresosDetalle||{}).length) ph[per].ingresosDetalle = pendingPershingCashDetail.ingresosDetalle;
-        if(Object.keys(pendingPershingCashDetail.cargosDetalle||{}).length) ph[per].cargosDetalle = pendingPershingCashDetail.cargosDetalle;
+        if((pendingPershingCashDetail.ingresosLineas||[]).length) ph[per].ingresosLineas = pendingPershingCashDetail.ingresosLineas;
+        if((pendingPershingCashDetail.cargosLineas||[]).length) ph[per].cargosLineas = pendingPershingCashDetail.cargosLineas;
+        if(distribucionBlackRockDelMes != null) ph[per].distribucionBlackRock = distribucionBlackRockDelMes;
         if(pendingPershingCashDetail.interesDevengadoRentaFija != null) ph[per].interesDevengadoRentaFija = pendingPershingCashDetail.interesDevengadoRentaFija;
         pendingPershingCashDetail = null;
       }
@@ -3483,15 +3513,32 @@
           pp.blackrock.valorActual = pos.blackrock.valorActual;
           if(pos.blackrock.precioAccion != null) pp.blackrock.precioAccion = pos.blackrock.precioAccion;
           if(pos.blackrock.acciones != null) pp.blackrock.acciones = pos.blackrock.acciones;
-          // si la IA no reportó la distribución dentro de "posiciones.blackrock", se usa el mismo monto que sí detectó en ingresosDetalle.distribucionesAlternativos (es el mismo dato real, visto desde otra sección del estado de cuenta)
-          var brDistribucion = pos.blackrock.distribucionMensual != null ? pos.blackrock.distribucionMensual : distribucionAlternativosFromCash;
+          // fuente única y prioritaria: el campo dedicado "distribucionBlackRock" (Transacciones por Tipo de
+          // Actividad → Distribuciones → Total de Distribuciones), capturado arriba antes de limpiar pendingPershingCashDetail
+          var brDistribucion = distribucionBlackRockDelMes;
           if(brDistribucion != null) pp.blackrock.distribucionMensual = brDistribucion;
           var bre = pp.blackrock.historial.find(function(h){ return h.per === per; });
-          var breEntry = { per: per, valor: pos.blackrock.valorActual, distribucion: brDistribucion||0, gpNoReal: pos.blackrock.gpNoReal||0 };
+          var breEntry = { per: per, valor: pos.blackrock.valorActual, distribucion: brDistribucion!=null?brDistribucion:(bre?bre.distribucion:0), gpNoReal: pos.blackrock.gpNoReal||0 };
           if(bre){ Object.assign(bre, breEntry); }
           else { pp.blackrock.historial.push(breEntry); }
+        } else if(distribucionBlackRockDelMes != null && pp.blackrock && Array.isArray(pp.blackrock.historial)){
+          // el documento trajo la distribución de BlackRock pero no una tabla de posición completa (valorActual) este mes:
+          // igual registramos/actualizamos la distribución del período para no perder el dato real.
+          pp.blackrock.distribucionMensual = distribucionBlackRockDelMes;
+          var breOnly = pp.blackrock.historial.find(function(h){ return h.per === per; });
+          if(breOnly){ breOnly.distribucion = distribucionBlackRockDelMes; }
+          else { pp.blackrock.historial.push({ per: per, valor: null, distribucion: distribucionBlackRockDelMes, gpNoReal: 0 }); }
         }
         pendingPershingPositions = null;
+      } else if(distribucionBlackRockDelMes != null){
+        // no vino tabla de posiciones en absoluto, pero sí la distribución de BlackRock: la registramos igual
+        var ppOnly = backup.state.pershingPosiciones || (backup.state.pershingPosiciones = { snapshots:{}, blackrock:{ historial:[] } });
+        if(!ppOnly.blackrock) ppOnly.blackrock = { historial:[] };
+        if(!Array.isArray(ppOnly.blackrock.historial)) ppOnly.blackrock.historial = [];
+        ppOnly.blackrock.distribucionMensual = distribucionBlackRockDelMes;
+        var breOnly2 = ppOnly.blackrock.historial.find(function(h){ return h.per === per; });
+        if(breOnly2){ breOnly2.distribucion = distribucionBlackRockDelMes; }
+        else { ppOnly.blackrock.historial.push({ per: per, valor: null, distribucion: distribucionBlackRockDelMes, gpNoReal: 0 }); }
       }
     }
     else if(t.kind === "rl360"){
