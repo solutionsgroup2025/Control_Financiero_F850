@@ -733,9 +733,9 @@
               <div class="form-field"><label>Fondos Mutuos</label><input type="number" step="0.01" id="ivFondosMutuos" placeholder="0.00"></div>
               <div class="form-field"><label>ETFs</label><input type="number" step="0.01" id="ivEtfs" placeholder="0.00"></div>
               <div class="form-field"><label>Alternativos</label><input type="number" step="0.01" id="ivAlternativos" placeholder="0.00"></div>
-              <div class="form-field full" id="ivPershingPosSummary" style="color:var(--text-muted);font-size:12.5px;"></div>
-              <div class="form-field full" id="ivPershingCashDetail"></div>
             </div>
+            <div id="ivPershingPosSummary" style="color:var(--text-muted);font-size:12.5px;margin-top:10px;"></div>
+            <div id="ivPershingCashDetail"></div>
             <div class="form-grid" style="margin-top:12px;">
               <div class="form-field full">
                 <label>Notas</label>
@@ -2436,55 +2436,100 @@
   /* ---------- Sweetwater Local (bonos, renta fija) ---------- */
   var SWL_MESES = ["Oct","Nov","Dic","Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep"];
   var SWL_MES_NUM = { "Ene":1,"Feb":2,"Mar":3,"Abr":4,"May":5,"Jun":6,"Jul":7,"Ago":8,"Sep":9,"Oct":10,"Nov":11,"Dic":12 };
+  // categorías de cargos recurrentes que reporta SweetWater — fee trimestral y comisión de custodia trimestral
+  // son DOS cargos distintos y separados (confirmado por el usuario), cada uno con su propio ITBMS
+  var SWL_CARGO_TIPOS = [
+    { key:"fee_trimestral", label:"Fee Trimestral" },
+    { key:"itbms_fee_trimestral", label:"7% F. Trim" },
+    { key:"comision_compra", label:"Comi x Comp. Bono" },
+    { key:"itbms_comision_compra", label:"7% Comp. Bono" },
+    { key:"interes_acumulado", label:"Int. Acumu" },
+    { key:"comision_custodia_trimestral", label:"Comisión Custodia Trim" },
+    { key:"itbms_custodia_trimestral", label:"7% Custodia" }
+  ];
   // el ciclo de bonosLocales es fijo (Oct→Sep, se repite cada año calendario) — esto calcula el año real de
   // cada columna a partir de la fecha de hoy, para que la etiqueta siempre sea correcta sin tocar el código
-  function swlMesesConAnio(meses){
+  function swlAnioFiscalInicio(){
     var hoy = new Date();
-    var inicioAnioFiscal = (hoy.getMonth()+1 >= 10) ? hoy.getFullYear() : hoy.getFullYear()-1;
-    return meses.map(function(m){
-      var num = SWL_MES_NUM[m];
-      if(num == null) return m;
-      var anio = num >= 10 ? inicioAnioFiscal : inicioAnioFiscal+1;
-      return m + " " + anio;
+    return (hoy.getMonth()+1 >= 10) ? hoy.getFullYear() : hoy.getFullYear()-1;
+  }
+  function swlMesAnio(mesNombre){
+    var num = SWL_MES_NUM[mesNombre];
+    if(num == null) return null;
+    var anio = num >= 10 ? swlAnioFiscalInicio() : swlAnioFiscalInicio()+1;
+    var mm = num < 10 ? "0"+num : String(num);
+    return { anio: anio, mesNum: num, iso: anio + "-" + mm, label: mesNombre + " " + anio };
+  }
+  function swlMesesConAnio(meses){ return meses.map(function(m){ var r = swlMesAnio(m); return r ? r.label : m; }); }
+  function swlMesesISO(meses){ return meses.map(function(m){ var r = swlMesAnio(m); return r ? r.iso : null; }); }
+  // convierte un periodo real "YYYY-MM" al índice fijo (0-11) del ciclo SWL_MESES [Oct..Sep]
+  function swlIdxDePeriodo(per){
+    var mm = Number(per.slice(5,7));
+    for(var i=0;i<SWL_MESES.length;i++){ if(SWL_MES_NUM[SWL_MESES[i]] === mm) return i; }
+    return null;
+  }
+  function swlUltimoPeriodo(hist){
+    var pers = (hist||[]).map(function(h){ return h.per; }).sort();
+    return pers.length ? pers[pers.length-1] : null;
+  }
+  function swlEsCompraReciente(bono, ultimoPeriodo){
+    if(!ultimoPeriodo || !bono.costoAdquisicion || !bono.costoAdquisicion.fechaCompra) return false;
+    var d = parseDMY(bono.costoAdquisicion.fechaCompra);
+    if(!d) return false;
+    var mm = (d.getMonth()+1); mm = mm<10 ? "0"+mm : String(mm);
+    return (d.getFullYear() + "-" + mm) === ultimoPeriodo;
+  }
+  // suma los cargos recurrentes reales del historial (bonosLocalesHistorial[per].cargosLineas), clasificados por
+  // tipo, en cada una de las 12 columnas de la proyección — devuelve una matriz [tipoIdx][mesIdx]
+  function computeSwlCargosPorTipo(hist, periodosISO){
+    var histByPer = {};
+    (hist||[]).forEach(function(h){ histByPer[h.per] = h; });
+    var porTipo = SWL_CARGO_TIPOS.map(function(){ return new Array(12).fill(0); });
+    periodosISO.forEach(function(iso, mi){
+      if(!iso) return;
+      var h = histByPer[iso];
+      if(!h || !h.cargosLineas) return;
+      h.cargosLineas.forEach(function(l){
+        var idx = SWL_CARGO_TIPOS.reduce(function(found,t,i){ return t.key===l.tipo ? i : found; }, -1);
+        if(idx !== -1) porTipo[idx][mi] += (l.monto||0);
+      });
     });
+    return porTipo;
   }
 
   function renderSwLocal(){
-    var bonos = backup.state.bonosLocales || [];
+    var todosBonos = backup.state.bonosLocales || [];
+    var bonos = todosBonos.filter(function(b){ return !b.pagado; });
+    var bonosPagados = todosBonos.filter(function(b){ return b.pagado; });
     var meses = backup.state.bonosLocalesMeses || SWL_MESES;
     var hist = backup.state.bonosLocalesHistorial || [];
+    var periodosISO = swlMesesISO(meses);
     var totalValor = bonos.reduce(function(s,b){ return s+(b.valor||0); },0);
     var flujoAnual = bonos.reduce(function(s,b){ return s + (b.flujo||[]).reduce(function(a,v){return a+v;},0); },0);
     var rentAnual = totalValor ? (flujoAnual/totalValor*100) : 0;
-    var proximoBono = bonos.slice().filter(function(b){return !b.alerta;}).sort(function(a,b){return (a.montoProximo||0) < (b.montoProximo||0) ? 1 : -1;})[0];
 
     var tirResults = bonos.map(function(b){ return computeBondTir(b); }).filter(Boolean);
     var costoRealTotal = tirResults.reduce(function(s,r){ return s+r.costoReal; }, 0);
     var tirPonderada = costoRealTotal ? tirResults.reduce(function(s,r){ return s + r.tir*r.costoReal; }, 0) / costoRealTotal : null;
-    var cargoTrimestralKpi = ultimoCargoTrimestral(hist);
-    var flujoNetoAnual = flujoAnual - cargoTrimestralKpi*4;
+    var cargosPorTipo = computeSwlCargosPorTipo(hist, periodosISO);
+    var totalAnualCargosReales = cargosPorTipo.reduce(function(s,fila){ return s + fila.reduce(function(a,v){return a+v;},0); }, 0);
+    var flujoNetoAnual = flujoAnual - totalAnualCargosReales;
     var efectivo = backup.state.bonosLocalesEfectivo;
 
     els.swlKpis.innerHTML =
       (efectivo ? '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">EFECTIVO EN CUENTA</div><div class="value">' + fmtMoney(efectivo.monto) + '</div><div class="foot">Según estado de cuenta al ' + escapeHtml(efectivo.fecha) + '</div></div>' : '') +
-      '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">CAPITAL EN BONOS</div><div class="value">' + fmtMoney(totalValor) + '</div><div class="foot">' + bonos.length + ' instrumentos activos</div></div>' +
+      '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">CAPITAL EN BONOS</div><div class="value">' + fmtMoney(totalValor) + '</div><div class="foot">' + bonos.length + ' instrumentos activos' + (bonosPagados.length ? " · " + bonosPagados.length + " pagados (ver Bonos)" : "") + '</div></div>' +
       '<div class="summary-card" style="--accent:var(--blue)"><div class="label">FLUJO ANUAL PROYECTADO</div><div class="value">' + fmtMoney(flujoAnual) + '</div><div class="foot">Cupones, próximos 12 meses (excluye devolución de capital)</div></div>' +
       '<div class="summary-card" style="--accent:var(--amber)"><div class="label">RENDIMIENTO CORRIENTE (SIMPLE)</div><div class="value">' + rentAnual.toFixed(1) + '%</div><div class="foot">Flujo anual / valor nominal — no ajustado por costos</div></div>' +
       '<div class="summary-card" style="--accent:var(--violet)"><div class="label">TIR PONDERADA DE CARTERA</div><div class="value" style="color:' + (tirPonderada!=null?'var(--violet)':'var(--text-dim)') + '">' + (tirPonderada!=null ? tirPonderada.toFixed(2)+'%' : '—') + '</div><div class="foot">' + (tirPonderada!=null ? tirResults.length + ' de ' + bonos.length + ' bonos con costo real cargado' : 'Carga el costo real en la pestaña "Costo Real & TIR"') + '</div></div>' +
       '<div class="summary-card" style="--accent:var(--blue)"><div class="label">BASE DE COSTO REAL</div><div class="value">' + (costoRealTotal ? fmtMoney(costoRealTotal) : '—') + '</div><div class="foot">Nominal + comisión + ITBMS + interés acumulado pagado</div></div>' +
-      '<div class="summary-card" style="--accent:var(--red)"><div class="label">FLUJO NETO ANUAL (después de fees)</div><div class="value" style="color:var(--emerald)">' + fmtMoney(flujoNetoAnual) + '</div><div class="foot">' + (cargoTrimestralKpi>0 ? "− " + fmtMoney(cargoTrimestralKpi*4) + "/año en cargos de custodia (últ. real: " + fmtMoney(cargoTrimestralKpi) + "/trim.)" : "Sin cargos recurrentes detectados en el historial") + '</div></div>';
+      '<div class="summary-card" style="--accent:var(--red)"><div class="label">FLUJO NETO ANUAL (después de fees)</div><div class="value" style="color:var(--emerald)">' + fmtMoney(flujoNetoAnual) + '</div><div class="foot">' + (totalAnualCargosReales>0 ? "− " + fmtMoney(totalAnualCargosReales) + "/año en cargos reales (ver desglose abajo)" : "Sin cargos reales detectados aún en el historial") + '</div></div>' +
+      '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">RENDIMIENTO NETO ANUAL</div><div class="value" style="color:var(--emerald)">' + (totalValor ? (flujoNetoAnual/totalValor*100).toFixed(2)+'%' : '—') + '</div><div class="foot">Flujo neto / capital en bonos — lo que realmente rinde después de todos los costos</div></div>';
 
-    buildSwlBonosTab(bonos, totalValor);
-    buildSwlFlujoTab(bonos, meses, hist, totalValor);
+    buildSwlBonosTab(bonos, bonosPagados, totalValor, swlUltimoPeriodo(hist));
+    buildSwlFlujoTab(bonos, meses, hist, totalValor, periodosISO, cargosPorTipo);
     buildSwlHistorialTab(hist);
     buildSwlCostosTab(bonos);
-  }
-
-  // cargo trimestral (custodia/manejo) más reciente reportado en el historial real de estados de cuenta —
-  // se usa como estimado para proyectar los próximos trimestres, ya que no hay forma de saber el monto exacto futuro de antemano
-  function ultimoCargoTrimestral(hist){
-    var conCargo = (hist||[]).filter(function(h){ return h.car > 0; }).slice().sort(function(a,b){ return a.per<b.per?1:-1; });
-    return conCargo.length ? conCargo[0].car : 0;
   }
 
   // frecuencia de pago legible, inferida del número de meses con cupón en el flujo cargado
@@ -2499,13 +2544,14 @@
     return freq + "x/año";
   }
 
-  function buildSwlBonosTab(bonos, totalValor){
+  function buildSwlBonosTab(bonos, bonosPagados, totalValor, ultimoPeriodo){
     var head = "<tr><th style='text-align:left'>Instrumento</th><th>Valor</th><th>Tasa</th><th>Frecuencia</th><th>Vencimiento</th><th>Próximo Cupón</th><th>Monto Próximo</th></tr>";
     var rows = bonos.map(function(b){
       var alertMark = b.alerta ? ' ⚠️' : '';
       var sched = inferCouponSchedule(b);
-      return "<tr" + (b.alerta ? " class='row-alert'" : "") + ">" +
-        "<td><div style='font-weight:700;" + (b.alerta?"color:var(--red)":"") + "'>" + escapeHtml(b.nombre) + alertMark + "</div><div style='font-size:10px;color:var(--text-dim)'>" + escapeHtml(b.codigo) + "</div></td>" +
+      var esNuevo = swlEsCompraReciente(b, ultimoPeriodo);
+      return "<tr" + (b.alerta ? " class='row-alert'" : "") + (esNuevo ? " style='background:" + hexToRgba("#f59e0b",0.12) + "'" : "") + ">" +
+        "<td><div style='font-weight:700;" + (b.alerta?"color:var(--red)":(esNuevo?"color:var(--amber)":"")) + "'>" + escapeHtml(b.nombre) + alertMark + (esNuevo ? " <span style='font-size:9px;background:var(--amber);color:#1a1200;padding:1px 6px;border-radius:8px;font-weight:800;'>NUEVO</span>" : "") + "</div><div style='font-size:10px;color:var(--text-dim)'>" + escapeHtml(b.codigo) + "</div></td>" +
         "<td>" + fmtMoney(b.valor) + "</td>" +
         "<td style='color:var(--blue);font-weight:600'>" + escapeHtml(b.tasa) + "</td>" +
         "<td style='color:var(--violet)'>" + frecuenciaLabel(sched && sched.freq) + "</td>" +
@@ -2514,17 +2560,30 @@
         "<td style='color:var(--emerald);font-weight:700'>" + fmtMoney(b.montoProximo) + "</td>" +
       "</tr>";
     }).join("");
-    var total = "<tr class='matrix-total'><td>TOTAL</td><td>" + fmtMoney(totalValor) + "</td><td colspan='5'></td></tr>";
-    els.swlBonosTable.innerHTML = head + rows + total;
+    var rowsPagados = bonosPagados.map(function(b){
+      return "<tr style='opacity:0.55;'>" +
+        "<td><div style='font-weight:700;color:var(--text-dim);text-decoration:line-through;'>" + escapeHtml(b.nombre) + "</div><div style='font-size:10px;color:var(--text-dim)'>" + escapeHtml(b.codigo) + " · PAGADO</div></td>" +
+        "<td style='color:var(--text-dim)'>(" + fmtMoney(b.valor) + ")</td>" +
+        "<td style='color:var(--text-dim)'>" + escapeHtml(b.tasa) + "</td>" +
+        "<td style='color:var(--text-dim)'>—</td>" +
+        "<td style='color:var(--text-dim)'>" + escapeHtml(b.vencimiento) + "</td>" +
+        "<td style='color:var(--text-dim)'>" + escapeHtml(b.proximoCupon||"—") + "</td>" +
+        "<td style='color:var(--text-dim)'>—</td>" +
+      "</tr>";
+    }).join("");
+    var total = "<tr class='matrix-total'><td>TOTAL ACTIVO</td><td>" + fmtMoney(totalValor) + "</td><td colspan='5'></td></tr>";
+    els.swlBonosTable.innerHTML = head + rows + rowsPagados + total;
   }
 
-  function buildSwlFlujoTab(bonos, meses, hist, totalValor){
+  function buildSwlFlujoTab(bonos, meses, hist, totalValor, periodosISO, cargosPorTipo){
     var mesesEtiquetas = swlMesesConAnio(meses);
+    var ultimoPeriodo = swlUltimoPeriodo(hist);
     var head = "<tr><th style='text-align:left'>Instrumento</th>" + mesesEtiquetas.map(function(m){ return "<th>"+escapeHtml(m)+"</th>"; }).join("") + "<th>Anual</th></tr>";
     var totMes = new Array(12).fill(0), totCapital = new Array(12).fill(0), rows = "";
     bonos.forEach(function(b){
       var anual = 0;
-      var cupRow = "<tr><td>" + escapeHtml(b.nombre.split(" ").slice(0,2).join(" ")) + " <span style='font-size:9px;color:var(--text-dim)'>" + escapeHtml(b.codigo) + "</span></td>";
+      var esNuevo = swlEsCompraReciente(b, ultimoPeriodo);
+      var cupRow = "<tr" + (esNuevo ? " style='background:" + hexToRgba("#f59e0b",0.12) + "'" : "") + "><td>" + escapeHtml(b.nombre.split(" ").slice(0,2).join(" ")) + (esNuevo ? " <span style='font-size:9px;background:var(--amber);color:#1a1200;padding:1px 5px;border-radius:8px;font-weight:800;'>NUEVO</span>" : "") + " <span style='font-size:9px;color:var(--text-dim)'>" + escapeHtml(b.codigo) + "</span></td>";
       (b.flujo||[]).forEach(function(v, mi){
         anual += v; totMes[mi] += v;
         cupRow += "<td style='color:" + (v>0?"var(--emerald)":"var(--text-dim)") + "'>" + (v>0 ? "$"+v.toFixed(2) : "—") + "</td>";
@@ -2544,37 +2603,55 @@
       }
     });
 
-    // cargo trimestral de custodia/manejo: se estima con el último monto real reportado en el historial (Oct/Ene/Abr/Jul, ciclo confirmado con datos reales)
-    var cargoTrimestral = ultimoCargoTrimestral(hist);
-    var totCargos = new Array(12).fill(0);
-    if(cargoTrimestral > 0){ [0,3,6,9].forEach(function(mi){ totCargos[mi] = cargoTrimestral; }); }
-
     var totCupRow = "<tr class='matrix-total'><td>TOTAL CUPONES</td>",
         totCapRow = "<tr class='matrix-capital' style='font-weight:800'><td>TOTAL DEVOLUCIÓN CAPITAL</td>",
-        totCargosRow = "<tr class='matrix-capital' style='color:var(--red)'><td>↳ Cargo trimestral estimado (custodia/manejo, últ. real: " + fmtMoney(cargoTrimestral) + ")</td>",
-        totFlujoRow = "<tr class='matrix-flujo-total'><td>FLUJO TOTAL (bruto)</td>",
-        netoRow = "<tr class='matrix-flujo-total' style='color:var(--emerald)'><td>FLUJO NETO (después de cargos)</td>",
-        capitalRestanteRow = "<tr style='color:var(--blue);font-weight:700'><td>CAPITAL NETO RESTANTE</td>";
-    var totalAnualCup = 0, totalAnualCap = 0, totalAnualCargos = 0, capitalRestante = totalValor;
+        totFlujoRow = "<tr class='matrix-flujo-total'><td>FLUJO TOTAL (bruto)</td>";
+    var totalAnualCup = 0, totalAnualCap = 0;
     for(var mi=0; mi<12; mi++){
-      totalAnualCup += totMes[mi]; totalAnualCap += totCapital[mi]; totalAnualCargos += totCargos[mi];
+      totalAnualCup += totMes[mi]; totalAnualCap += totCapital[mi];
       totCupRow += "<td>" + (totMes[mi]>0?fmtMoney(totMes[mi]):"—") + "</td>";
       totCapRow += "<td>" + (totCapital[mi]>0?fmtMoney(totCapital[mi]):"—") + "</td>";
-      totCargosRow += "<td>" + (totCargos[mi]>0?("−"+fmtMoney(totCargos[mi])):"—") + "</td>";
       var ft = totMes[mi] + totCapital[mi];
       totFlujoRow += "<td>" + (ft>0?fmtMoney(ft):"—") + "</td>";
-      var neto = ft - totCargos[mi];
-      netoRow += "<td>" + (neto!==0?fmtMoney(neto):"—") + "</td>";
-      capitalRestante -= totCapital[mi];
-      capitalRestanteRow += "<td>" + (totCapital[mi]>0 ? fmtMoney(capitalRestante) : "—") + "</td>";
     }
     totCupRow += "<td>" + fmtMoney(totalAnualCup) + "</td></tr>";
     totCapRow += "<td>" + fmtMoney(totalAnualCap) + "</td></tr>";
-    totCargosRow += "<td style='color:var(--red)'>−" + fmtMoney(totalAnualCargos) + "</td></tr>";
     totFlujoRow += "<td>" + fmtMoney(totalAnualCup+totalAnualCap) + "</td></tr>";
-    netoRow += "<td>" + fmtMoney(totalAnualCup+totalAnualCap-totalAnualCargos) + "</td></tr>";
+
+    // desglose real de cargos por tipo (extraídos del historial de estados de cuenta, línea por línea)
+    var cargoRows = "", totalAnualCargosTotal = 0;
+    var totCargosGeneral = new Array(12).fill(0);
+    SWL_CARGO_TIPOS.forEach(function(tipo, ti){
+      var fila = cargosPorTipo[ti];
+      var totalTipo = fila.reduce(function(s,v){return s+v;},0);
+      totalAnualCargosTotal += totalTipo;
+      var r = "<tr class='matrix-capital' style='color:var(--red)'><td style='padding-left:18px'>↳ " + escapeHtml(tipo.label) + "</td>";
+      for(var mi2=0; mi2<12; mi2++){
+        totCargosGeneral[mi2] += fila[mi2];
+        r += "<td>" + (fila[mi2]>0 ? "−"+fmtMoney(fila[mi2]) : "—") + "</td>";
+      }
+      r += "<td style='color:var(--red)'>" + (totalTipo>0?"−"+fmtMoney(totalTipo):"—") + "</td></tr>";
+      cargoRows += r;
+    });
+    var totCargosRow = "<tr class='matrix-capital' style='font-weight:800;color:var(--red)'><td>TOTAL COSTOS Y GASTOS</td>";
+    for(var mi3=0; mi3<12; mi3++){ totCargosRow += "<td>" + (totCargosGeneral[mi3]>0?"−"+fmtMoney(totCargosGeneral[mi3]):"—") + "</td>"; }
+    totCargosRow += "<td style='color:var(--red)'>−" + fmtMoney(totalAnualCargosTotal) + "</td></tr>";
+
+    var netoRow = "<tr class='matrix-flujo-total' style='color:var(--emerald)'><td>FLUJO NETO (después de cargos)</td>";
+    var capitalRestanteRow = "<tr style='color:var(--blue);font-weight:700'><td>CAPITAL NETO RESTANTE</td>";
+    var capitalRestante = totalValor, totalAnualNeto = 0;
+    for(var mi4=0; mi4<12; mi4++){
+      var ft2 = totMes[mi4] + totCapital[mi4];
+      var neto = ft2 - totCargosGeneral[mi4];
+      totalAnualNeto += (totMes[mi4] - totCargosGeneral[mi4]); // el neto anual de RENDIMIENTO no incluye devolución de capital, solo cupones - costos
+      netoRow += "<td>" + (neto!==0?fmtMoney(neto):"—") + "</td>";
+      capitalRestante -= totCapital[mi4];
+      capitalRestanteRow += "<td>" + (totCapital[mi4]>0 ? fmtMoney(capitalRestante) : "—") + "</td>";
+    }
+    netoRow += "<td>" + fmtMoney(totalAnualCup+totalAnualCap-totalAnualCargosTotal) + "</td></tr>";
     capitalRestanteRow += "<td>" + fmtMoney(capitalRestante) + "</td></tr>";
-    els.swlFlujoTable.innerHTML = head + rows + totCupRow + totCapRow + totCargosRow + totFlujoRow + netoRow + capitalRestanteRow;
+
+    els.swlFlujoTable.innerHTML = head + rows + totCupRow + totCapRow + totFlujoRow + cargoRows + totCargosRow + netoRow + capitalRestanteRow;
   }
 
   var swlHistYear = null;
@@ -3301,7 +3378,7 @@
 
   /* ---------- Motor de ingesta acumulativa multiactivo ---------- */
   var MODULE_TARGETS = {
-    "sw-local":   { label:"Sweetwater Local (bonos)",              kind:"historial", investmentId:"sweetwater",
+    "sw-local":   { label:"Sweetwater Local (bonos)",              kind:"sw-local-bonos", investmentId:"sweetwater",
                     valorLabel:"Total del período",   ingLabel:"Cupones cobrados",        carLabel:"Cargos" },
     "sw-pershing":{ label:"Sweetwater Pershing (multi-activo)",     kind:"pershing",  investmentId:"pershing",
                     valorLabel:"Valor total del período", ingLabel:"Ingresos brutos",      carLabel:"Cargos" },
@@ -3423,6 +3500,7 @@
 
   var pendingPershingPositions = null;
   var pendingPershingCashDetail = null;
+  var pendingSwLocalData = null;
 
   function prefillReviewForm(obj){
     if(!obj) return;
@@ -3486,6 +3564,52 @@
         els.ivPershingCashDetail.innerHTML = "";
       }
     }
+
+    // SW Local: compras nuevas, cupones de bonos existentes, vencimientos y cargos recurrentes
+    var esSwLocalData = obj.comprasNuevas || obj.cuponesRecibidos || obj.vencimientos;
+    if(esSwLocalData){
+      pendingSwLocalData = {
+        efectivo: obj.efectivo,
+        cuponesRecibidos: obj.cuponesRecibidos || [],
+        comprasNuevas: obj.comprasNuevas || [],
+        vencimientos: obj.vencimientos || [],
+        cargosLineas: obj.cargosLineas || []
+      };
+      var ingresoSwl = pendingSwLocalData.cuponesRecibidos.reduce(function(s,c){ return s+(c.monto||0); }, 0);
+      var cargoSwl = pendingSwLocalData.cargosLineas.reduce(function(s,l){ return s+(l.monto||0); }, 0);
+      pendingSwLocalData.comprasNuevas.forEach(function(cn){ cargoSwl += (cn.comision||0) + (cn.itbms||0) + (cn.interesAcumulado||0); });
+      els.ivIngresos.value = round2(ingresoSwl);
+      els.ivCargos.value = round2(cargoSwl);
+
+      if(els.ivPershingPosSummary){
+        var partsSwl = [];
+        if(pendingSwLocalData.comprasNuevas.length) partsSwl.push(pendingSwLocalData.comprasNuevas.length + " compra(s) nueva(s)");
+        if(pendingSwLocalData.vencimientos.length) partsSwl.push(pendingSwLocalData.vencimientos.length + " vencimiento(s)");
+        if(pendingSwLocalData.cuponesRecibidos.length) partsSwl.push(pendingSwLocalData.cuponesRecibidos.length + " cupón(es) recibido(s)");
+        els.ivPershingPosSummary.textContent = partsSwl.length ? "✓ Detectado: " + partsSwl.join(", ") + " — revisa el JSON de arriba antes de aplicar." : "";
+      }
+      if(els.ivPershingCashDetail){
+        var linesSwl = [];
+        pendingSwLocalData.comprasNuevas.forEach(function(cn){
+          linesSwl.push("<span style='color:var(--amber);font-weight:700;'>NUEVA COMPRA</span> " + escapeHtml(cn.nombre||cn.codigo) + " — " + fmtMoney(cn.valorNominal) + " @ " + escapeHtml(cn.precioCompra!=null?String(cn.precioCompra):"100") + "% (comisión " + fmtMoney(cn.comision) + " + ITBMS " + fmtMoney(cn.itbms) + " + interés acum. " + fmtMoney(cn.interesAcumulado) + ")");
+        });
+        pendingSwLocalData.vencimientos.forEach(function(v){
+          linesSwl.push("<span style='color:var(--text-dim);font-weight:700;'>VENCIMIENTO</span> " + escapeHtml(v.codigo) + " — " + fmtMoney(v.monto));
+        });
+        pendingSwLocalData.cuponesRecibidos.forEach(function(c){
+          linesSwl.push("<span style='color:var(--emerald)'>+" + fmtMoney(c.monto) + "</span> Cupón " + escapeHtml(c.codigo));
+        });
+        pendingSwLocalData.cargosLineas.forEach(function(l){
+          linesSwl.push("<span style='color:var(--red)'>−" + fmtMoney(Math.abs(l.monto)) + "</span> " + escapeHtml(l.descripcion||"Cargo") + (l.tipo ? " <span style='color:var(--text-dim);font-size:10px;'>(" + escapeHtml(l.tipo) + ")</span>" : ""));
+        });
+        if(pendingSwLocalData.efectivo != null) linesSwl.push("<span style='color:var(--blue)'>" + fmtMoney(pendingSwLocalData.efectivo) + "</span> Efectivo en cuenta al cierre del período");
+        els.ivPershingCashDetail.innerHTML = linesSwl.length
+          ? "<div style='color:var(--text-dim);font-size:11.5px;margin-bottom:4px;'>Desglose detectado (revisa contra el PDF antes de aplicar):</div><div style='font-size:12.5px;line-height:1.9;'>" + linesSwl.join("<br>") + "</div>"
+          : "";
+      }
+    } else {
+      pendingSwLocalData = null;
+    }
   }
 
   function extractJsonBlock(text){
@@ -3534,6 +3658,7 @@
         pdfPreviewText = text.length > 120000 ? text.slice(0,120000) : text;
         els.importStatus.textContent = "Interpretando " + file.name + " con IA…";
         var isPershing = els.importTarget.value === "sw-pershing";
+        var isSwLocal = els.importTarget.value === "sw-local";
         var promptText = isPershing
           ? "Este es el texto extraído de un estado de cuenta de Pershing/SweetWater (multi-activo: fondos mutuos, bonos corporativos, ETFs, y una posición BlackRock Private Credit Fund):\n\n" + pdfPreviewText +
             "\n\nEl documento típicamente tiene estas secciones — úsalas como guía para ubicar cada dato:\n" +
@@ -3557,6 +3682,26 @@
             "   - blackrock: {\"valorActual\":0,\"precioAccion\":0,\"acciones\":0,\"gpNoReal\":0} (valor/precio/acciones de la POSICIÓN de BlackRock en la tabla de holdings — NO pongas aquí la distribución, esa va en el campo \"distribucionBlackRock\" del nivel superior)\n" +
             "IMPORTANTE: si alguna sección no aparece en el documento, omítela o déjala como arreglo/objeto vacío — NO inventes posiciones, cargos ni cifras que no estén literalmente en el texto. Responde SOLO con el JSON, sin texto adicional."
           + "\n\nEjemplo del formato de respuesta esperado (con datos de ejemplo, no los copies):\n{\"periodo\":\"2026-05\",\"total\":222218.47,\"distribucionBlackRock\":665.36,\"ingresos\":704.13,\"cargos\":64.50,\"depositos\":0,\"composicion\":{},\"ingresosLineas\":[{\"descripcion\":\"Fondos Money Market\",\"monto\":20.38},{\"descripcion\":\"Intereses de Bonos\",\"monto\":683.75}],\"cargosLineas\":[{\"descripcion\":\"Foreign Custody Fee\",\"monto\":2.00},{\"descripcion\":\"Administration Fee\",\"monto\":62.50}],\"posiciones\":{}}"
+          : isSwLocal
+          ? "Este es el texto extraído de un estado de cuenta de SweetWater Securities (bonos locales panameños, renta fija + acciones preferidas):\n\n" + pdfPreviewText +
+            "\n\nEl documento tiene estas secciones — úsalas como guía:\n" +
+            "- \"Análisis de portafolio\" / \"Clases de activo\": composición Efectivo/Renta Fija/Acc. Preferidas. Usa el monto en efectivo para el campo \"efectivo\".\n" +
+            "- \"Actividad de la cuenta\": ledger de transacciones línea por línea (columnas Fecha, Descripción, Crédito, Débito, Saldo). Contiene tres tipos de eventos distintos que debes separar:\n" +
+            "  (a) \"Cupón <CODIGO> <EMISOR> ... <fecha> <monto>\" o \"Dividendos <CODIGO> ...\" — pago recibido de un bono/acción YA EXISTENTE en la cartera. Va en cuponesRecibidos.\n" +
+            "  (b) \"COMPRA <cantidad> <EMISOR> A <precio>%\" seguido de líneas \"INTERES ACUMULADO\", \"COMISION\", \"ITBMS\", y una línea \"COMPRA <cantidad>,00 <NOMBRE COMPLETO> <CODIGO><fecha> <monto>\" — esto es una COMPRA NUEVA de un instrumento. Repórtala completa en comprasNuevas (código, nombre, valor nominal, tasa, vencimiento — búscalo también en la tabla de tenencias si no aparece en la compra —, fecha de compra, precio de compra %, comisión, ITBMS, interés acumulado).\n" +
+            "  (c) \"Vencimiento <CODIGO> <EMISOR> ... <monto>\" — el instrumento venció/se redimió completamente y ya no aparece en las tenencias. Repórtalo en vencimientos.\n" +
+            "- Puede haber cargos recurrentes de la cuenta NO ligados a una compra específica, como \"FEE TRIMESTRAL\" y \"COMISION CUSTODIA\" (o nombres similares), cada uno con su propio ITBMS (7%). Estos son DOS cargos DISTINTOS y separados que cobra SweetWater cada trimestre — no los confundas entre sí, ni con las comisiones de compra de bonos. Repórtalos en cargosLineas con su descripción literal y clasifícalos con tipo: \"fee_trimestral\", \"itbms_fee_trimestral\", \"comision_custodia_trimestral\", \"itbms_custodia_trimestral\" — si no reconoces con certeza cuál de los dos es, usa tipo:\"otro\" pero conserva la descripción literal (NUNCA adivines el tipo si no estás seguro).\n" +
+            "- La tabla de tenencias \"Renta Fija\" / \"Acciones Preferidas\" trae Vencimiento, Tasa, Fecha de Compra y Precio de Compra de cada instrumento — úsala para completar datos de comprasNuevas que no vengan completos en el ledger.\n" +
+            "\nExtrae TODO lo siguiente:\n" +
+            "1. periodo (YYYY-MM, mes de corte del estado de cuenta)\n" +
+            "2. total: valor total del portafolio al final del periodo (\"Total del portafolio\")\n" +
+            "3. efectivo: monto en efectivo al final del periodo\n" +
+            "4. cuponesRecibidos: [{\"codigo\":\"...\",\"monto\":0}] — CADA cupón/dividendo individual recibido en el periodo de instrumentos ya existentes\n" +
+            "5. comprasNuevas: [{\"codigo\":\"...\",\"nombre\":\"...\",\"valorNominal\":0,\"tasa\":\"X.XX%\",\"vencimiento\":\"DD/MM/AAAA\",\"fechaCompra\":\"DD/MM/AAAA\",\"precioCompra\":100,\"comision\":0,\"itbms\":0,\"interesAcumulado\":0}] — CADA compra nueva del periodo\n" +
+            "6. vencimientos: [{\"codigo\":\"...\",\"monto\":0}] — instrumentos que vencieron/se redimieron completamente este periodo\n" +
+            "7. cargosLineas: [{\"descripcion\":\"...\",\"monto\":0,\"tipo\":\"fee_trimestral|itbms_fee_trimestral|comision_custodia_trimestral|itbms_custodia_trimestral|otro\"}] — SOLO cargos recurrentes de cuenta, NO ligados a una compra específica (esos van dentro de comprasNuevas)\n" +
+            "IMPORTANTE: si alguna sección no aparece, omítela o déjala vacía — NO inventes cupones, compras, vencimientos ni cargos que no estén literalmente en el texto. Responde SOLO con el JSON, sin texto adicional."
+          + "\n\nEjemplo de formato esperado:\n{\"periodo\":\"2026-03\",\"total\":229292.58,\"efectivo\":1442.58,\"cuponesRecibidos\":[{\"codigo\":\"ALUT0875000527W\",\"monto\":612.50}],\"comprasNuevas\":[{\"codigo\":\"ALUT0900000727J\",\"nombre\":\"Alutech S.A. 9%\",\"valorNominal\":20000,\"tasa\":\"9.00%\",\"vencimiento\":\"28/07/2027\",\"fechaCompra\":\"13/03/2026\",\"precioCompra\":100,\"comision\":40.00,\"itbms\":2.80,\"interesAcumulado\":230.00}],\"vencimientos\":[{\"codigo\":\"MIFI0900001026N\",\"monto\":52000}],\"cargosLineas\":[{\"descripcion\":\"Fee Trimestral\",\"monto\":390.00,\"tipo\":\"fee_trimestral\"},{\"descripcion\":\"ITBMS 7%\",\"monto\":27.30,\"tipo\":\"itbms_fee_trimestral\"}]}"
           : "Este es el texto extraído de un estado de cuenta financiero:\n\n" + pdfPreviewText + "\n\nExtrae: periodo (formato YYYY-MM), saldo/valor total del periodo, ingresos/cupones/réditos/canon del periodo, y cargos/comisiones del periodo. " +
             "Además, si el documento trae detalle línea por línea de transacciones (ej. \"Cupón X\", \"COMISION\", \"ITBMS\", \"INTERES ACUMULADO\", cargos de custodia/manejo, etc.), inclúyelo en ingresosLineas y cargosLineas como arreglos de {\"descripcion\":\"...\",\"monto\":0} — una línea por cada transacción individual del período, con su descripción literal (ej. \"Cupón ALUT0875000527W\", \"Comisión compra\", \"ITBMS 7%\"). Si no hay detalle línea por línea disponible, omite estos dos campos. " +
             "Responde SOLO con JSON: {\"periodo\":\"YYYY-MM\",\"total\":0,\"ingresos\":0,\"cargos\":0,\"ingresosLineas\":[{\"descripcion\":\"...\",\"monto\":0}],\"cargosLineas\":[{\"descripcion\":\"...\",\"monto\":0}]}";
@@ -3570,7 +3715,7 @@
           },
           body: JSON.stringify({
             model: "claude-sonnet-4-5",
-            max_tokens: isPershing ? 4096 : 1024,
+            max_tokens: (isPershing || isSwLocal) ? 4096 : 1024,
             messages: [{ role: "user", content: promptText }]
           })
         });
@@ -3653,6 +3798,75 @@
       if(!existing) hist.push(entryH);
       var acc = findInv(t.investmentId);
       if(acc){ if(valorTotal!=null) acc.value = valorTotal; acc.flujoMensual = { per:per, ing:ingresos, car:cargos }; }
+    }
+    else if(t.kind === "sw-local-bonos"){
+      var bl = backup.state.bonosLocales || (backup.state.bonosLocales = []);
+      var histSL = backup.state.bonosLocalesHistorial || (backup.state.bonosLocalesHistorial = []);
+      var existingSL = histSL.find(function(h){ return h.per === per; });
+      var entrySL = existingSL || { per:per, total:0, ing:0, car:0 };
+      if(valorTotal != null) entrySL.total = valorTotal;
+
+      var swl = pendingSwLocalData;
+      var cargosGenerados = [];
+      var ingresoTotalSL = 0;
+      var idxPeriodo = swlIdxDePeriodo(per);
+      var bonosNuevosCodigos = [];
+
+      if(swl){
+        // 1. cupones/dividendos de instrumentos existentes: se actualiza el flujo en su posición calendario real
+        (swl.cuponesRecibidos||[]).forEach(function(c){
+          ingresoTotalSL += (c.monto||0);
+          var bono = bl.find(function(b){ return b.codigo === c.codigo; });
+          if(bono && idxPeriodo != null){
+            if(!Array.isArray(bono.flujo) || bono.flujo.length !== 12) bono.flujo = new Array(12).fill(0);
+            bono.flujo[idxPeriodo] = c.monto;
+          }
+        });
+
+        // 2. compras nuevas: crea el instrumento si no existe (con costo real de adquisición), y genera sus cargos derivados
+        (swl.comprasNuevas||[]).forEach(function(cn){
+          if(!cn.codigo) return;
+          var existeBono = bl.find(function(b){ return b.codigo === cn.codigo; });
+          if(!existeBono){
+            bl.push({
+              tasa: cn.tasa || "", flujo: new Array(12).fill(0), valor: cn.valorNominal||0, alerta:false,
+              codigo: cn.codigo, nombre: cn.nombre || cn.codigo, vencimiento: cn.vencimiento || "N/A",
+              montoProximo: 0, proximoCupon: "Pendiente (sin cupón registrado aún)", vencimientoCapital: 0,
+              costoAdquisicion: { fechaCompra: cn.fechaCompra||null, precioCompra: cn.precioCompra!=null?cn.precioCompra:100, comision: cn.comision||0, itbms: cn.itbms||0, interesAcumulado: cn.interesAcumulado||0 }
+            });
+            bonosNuevosCodigos.push(cn.codigo);
+          }
+          if(cn.comision) cargosGenerados.push({ descripcion: "Comisión compra " + (cn.nombre||cn.codigo), monto: cn.comision, tipo: "comision_compra" });
+          if(cn.itbms) cargosGenerados.push({ descripcion: "ITBMS comisión compra " + (cn.nombre||cn.codigo), monto: cn.itbms, tipo: "itbms_comision_compra" });
+          if(cn.interesAcumulado) cargosGenerados.push({ descripcion: "Interés acumulado " + (cn.nombre||cn.codigo), monto: cn.interesAcumulado, tipo: "interes_acumulado" });
+        });
+
+        // 3. vencimientos: se marca el instrumento como pagado — queda visible en el tablero como rastro de auditoría, pero ya no cuenta en los totales activos
+        (swl.vencimientos||[]).forEach(function(v){
+          var bonoVenc = bl.find(function(b){ return b.codigo === v.codigo; });
+          if(bonoVenc){ bonoVenc.pagado = true; bonoVenc.proximoCupon = "Pagado (vencido " + per + ")"; bonoVenc.montoProximo = 0; }
+        });
+
+        // 4. cargos recurrentes de cuenta reportados directamente (fee trimestral, comisión de custodia, etc.)
+        (swl.cargosLineas||[]).forEach(function(l){ cargosGenerados.push(l); });
+
+        // 5. efectivo en cuenta al cierre del período
+        if(swl.efectivo != null){
+          backup.state.bonosLocalesEfectivo = { monto: swl.efectivo, fecha: per };
+        }
+      }
+
+      var cargoTotalSL = cargosGenerados.reduce(function(s,l){ return s+(l.monto||0); }, 0);
+      entrySL.ing = ingresoTotalSL || entrySL.ing;
+      entrySL.car = cargoTotalSL || entrySL.car;
+      if(cargosGenerados.length) entrySL.cargosLineas = cargosGenerados;
+      if(!existingSL) histSL.push(entrySL);
+
+      var accSL = findInv(t.investmentId);
+      if(accSL){ if(valorTotal!=null) accSL.value = valorTotal; accSL.flujoMensual = { per:per, ing:entrySL.ing, car:entrySL.car }; }
+
+      pendingSwLocalData = null;
+      if(bonosNuevosCodigos.length) resumenParts.push(bonosNuevosCodigos.length + " bono(s) nuevo(s): " + bonosNuevosCodigos.join(", "));
     }
     else if(t.kind === "pershing"){
       var ph = backup.state.pershingHistorial || (backup.state.pershingHistorial = {});
@@ -3801,6 +4015,7 @@
     els.ivSaldoAnterior.value = ""; els.ivPershingDepositos.value = ""; els.ivEfectivo.value = ""; els.ivRentaFija.value = ""; els.ivFondosMutuos.value = ""; els.ivEtfs.value = ""; els.ivAlternativos.value = "";
     if(els.ivPershingCashDetail) els.ivPershingCashDetail.innerHTML = "";
     pendingPershingCashDetail = null;
+    pendingSwLocalData = null;
     els.importPreview.style.display = "none";
     els.importStatus.style.display = "none";
     els.importFile.value = "";
