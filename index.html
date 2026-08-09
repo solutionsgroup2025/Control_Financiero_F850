@@ -2470,16 +2470,12 @@
     for(var i=0;i<SWL_MESES.length;i++){ if(SWL_MES_NUM[SWL_MESES[i]] === mm) return i; }
     return null;
   }
-  function swlUltimoPeriodo(hist){
-    var pers = (hist||[]).map(function(h){ return h.per; }).sort();
-    return pers.length ? pers[pers.length-1] : null;
-  }
-  function swlEsCompraReciente(bono, ultimoPeriodo){
-    if(!ultimoPeriodo || !bono.costoAdquisicion || !bono.costoAdquisicion.fechaCompra) return false;
-    var d = parseDMY(bono.costoAdquisicion.fechaCompra);
-    if(!d) return false;
-    var mm = (d.getMonth()+1); mm = mm<10 ? "0"+mm : String(mm);
-    return (d.getFullYear() + "-" + mm) === ultimoPeriodo;
+  // "nuevo" = se agregó al sistema hace poco (real, por reloj) — no depende del mes del estado de cuenta, para que
+  // funcione bien tambien cuando se sube un estado de cuenta atrasado despues de meses mas recientes ya cargados
+  function swlEsCompraReciente(bono){
+    if(!bono.agregadoEl) return false;
+    var dias = (Date.now() - new Date(bono.agregadoEl).getTime()) / (1000*60*60*24);
+    return dias >= 0 && dias <= 7;
   }
   // suma los cargos recurrentes reales del historial (bonosLocalesHistorial[per].cargosLineas), clasificados por
   // tipo, en cada una de las 12 columnas de la proyección — devuelve una matriz [tipoIdx][mesIdx]
@@ -2528,7 +2524,7 @@
       '<div class="summary-card" style="--accent:var(--red)"><div class="label">FLUJO NETO ANUAL (después de fees)</div><div class="value" style="color:var(--emerald)">' + fmtMoney(flujoNetoAnual) + '</div><div class="foot">' + (totalAnualCargosReales>0 ? "− " + fmtMoney(totalAnualCargosReales) + "/año en cargos reales (ver desglose abajo)" : "Sin cargos reales detectados aún en el historial") + '</div></div>' +
       '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">RENDIMIENTO NETO ANUAL</div><div class="value" style="color:var(--emerald)">' + (totalValor ? (flujoNetoAnual/totalValor*100).toFixed(2)+'%' : '—') + '</div><div class="foot">Flujo neto / capital en bonos — lo que realmente rinde después de todos los costos</div></div>';
 
-    buildSwlBonosTab(bonos, bonosPagados, totalValor, swlUltimoPeriodo(hist));
+    buildSwlBonosTab(bonos, bonosPagados, totalValor);
     buildSwlFlujoTab(bonos, meses, hist, totalValor, periodosISO, cargosPorTipo);
     buildSwlHistorialTab(hist);
     buildSwlCostosTab(bonos);
@@ -2546,45 +2542,48 @@
     return freq + "x/año";
   }
 
-  function buildSwlBonosTab(bonos, bonosPagados, totalValor, ultimoPeriodo){
-    var head = "<tr><th style='text-align:left'>Instrumento</th><th>Valor</th><th>Tasa</th><th>Frecuencia</th><th>Vencimiento</th><th>Próximo Cupón</th><th>Monto Próximo</th></tr>";
+  function buildSwlBonosTab(bonos, bonosPagados, totalValor){
+    var head = "<tr><th style='text-align:left'>Instrumento</th><th>Valor</th><th>Tasa</th><th>Frecuencia</th><th>Fecha Compra</th><th>Vencimiento</th><th>Próximo Cupón</th><th>Monto Próximo</th></tr>";
     var rows = bonos.map(function(b){
       var alertMark = b.alerta ? ' ⚠️' : '';
       var sched = inferCouponSchedule(b);
-      var esNuevo = swlEsCompraReciente(b, ultimoPeriodo);
+      var esNuevo = swlEsCompraReciente(b);
+      var fechaCompra = (b.costoAdquisicion && b.costoAdquisicion.fechaCompra) || "—";
       return "<tr" + (b.alerta ? " class='row-alert'" : "") + (esNuevo ? " style='background:" + hexToRgba("#f59e0b",0.12) + "'" : "") + ">" +
         "<td><div style='font-weight:700;" + (b.alerta?"color:var(--red)":(esNuevo?"color:var(--amber)":"")) + "'>" + escapeHtml(b.nombre) + alertMark + (esNuevo ? " <span style='font-size:9px;background:var(--amber);color:#1a1200;padding:1px 6px;border-radius:8px;font-weight:800;'>NUEVO</span>" : "") + "</div><div style='font-size:10px;color:var(--text-dim)'>" + escapeHtml(b.codigo) + "</div></td>" +
         "<td>" + fmtMoney(b.valor) + "</td>" +
         "<td style='color:var(--blue);font-weight:600'>" + escapeHtml(b.tasa) + "</td>" +
         "<td style='color:var(--violet)'>" + frecuenciaLabel(sched && sched.freq) + "</td>" +
+        "<td>" + escapeHtml(fechaCompra) + "</td>" +
         "<td>" + escapeHtml(b.vencimiento) + "</td>" +
         "<td style='color:" + (b.alerta?"var(--red)":"var(--amber)") + "'>" + escapeHtml(b.proximoCupon) + "</td>" +
         "<td style='color:var(--emerald);font-weight:700'>" + fmtMoney(b.montoProximo) + "</td>" +
       "</tr>";
     }).join("");
     var rowsPagados = bonosPagados.map(function(b){
+      var fechaCompraP = (b.costoAdquisicion && b.costoAdquisicion.fechaCompra) || "—";
       return "<tr style='background:" + hexToRgba("#f59e0b",0.08) + ";'>" +
         "<td><div style='font-weight:700;color:var(--amber);text-decoration:line-through;'>⚠️ " + escapeHtml(b.nombre) + "</div><div style='font-size:10px;color:var(--amber)'>" + escapeHtml(b.codigo) + " · PAGADO</div></td>" +
         "<td style='color:var(--amber);font-weight:700;'>(" + fmtMoney(b.valor) + ")</td>" +
         "<td style='color:var(--amber)'>" + escapeHtml(b.tasa) + "</td>" +
         "<td style='color:var(--amber)'>—</td>" +
+        "<td style='color:var(--amber)'>" + escapeHtml(fechaCompraP) + "</td>" +
         "<td style='color:var(--amber)'>" + escapeHtml(b.vencimiento) + "</td>" +
         "<td style='color:var(--amber)'>" + escapeHtml(b.proximoCupon||"—") + "</td>" +
         "<td style='color:var(--amber)'>—</td>" +
       "</tr>";
     }).join("");
-    var total = "<tr class='matrix-total'><td>TOTAL ACTIVO</td><td>" + fmtMoney(totalValor) + "</td><td colspan='5'></td></tr>";
+    var total = "<tr class='matrix-total'><td>TOTAL ACTIVO</td><td>" + fmtMoney(totalValor) + "</td><td colspan='6'></td></tr>";
     els.swlBonosTable.innerHTML = head + rows + rowsPagados + total;
   }
 
   function buildSwlFlujoTab(bonos, meses, hist, totalValor, periodosISO, cargosPorTipo){
     var mesesEtiquetas = swlMesesConAnio(meses);
-    var ultimoPeriodo = swlUltimoPeriodo(hist);
     var head = "<tr><th style='text-align:left'>Instrumento</th>" + mesesEtiquetas.map(function(m){ return "<th>"+escapeHtml(m)+"</th>"; }).join("") + "<th>Anual</th></tr>";
     var totMes = new Array(12).fill(0), totCapital = new Array(12).fill(0), rows = "";
     bonos.forEach(function(b){
       var anual = 0;
-      var esNuevo = swlEsCompraReciente(b, ultimoPeriodo);
+      var esNuevo = swlEsCompraReciente(b);
       var cupRow = "<tr" + (esNuevo ? " style='background:" + hexToRgba("#f59e0b",0.12) + "'" : "") + "><td>" + escapeHtml(b.nombre.split(" ").slice(0,2).join(" ")) + (esNuevo ? " <span style='font-size:9px;background:var(--amber);color:#1a1200;padding:1px 5px;border-radius:8px;font-weight:800;'>NUEVO</span>" : "") + " <span style='font-size:9px;color:var(--text-dim)'>" + escapeHtml(b.codigo) + "</span></td>";
       (b.flujo||[]).forEach(function(v, mi){
         anual += v; totMes[mi] += v;
@@ -3845,6 +3844,7 @@
               tasa: cn.tasa || "", flujo: new Array(12).fill(0), valor: cn.valorNominal||0, alerta:false,
               codigo: cn.codigo, nombre: cn.nombre || cn.codigo, vencimiento: cn.vencimiento || "N/A",
               montoProximo: 0, proximoCupon: "Pendiente (sin cupón registrado aún)", vencimientoCapital: 0,
+              agregadoEl: new Date().toISOString(),
               costoAdquisicion: { fechaCompra: cn.fechaCompra||null, precioCompra: cn.precioCompra!=null?cn.precioCompra:100, comision: cn.comision||0, itbms: cn.itbms||0, interesAcumulado: cn.interesAcumulado||0 }
             });
             bonosNuevosCodigos.push(cn.codigo);
