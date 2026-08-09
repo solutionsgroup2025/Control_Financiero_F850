@@ -2448,18 +2448,28 @@
     var tirResults = bonos.map(function(b){ return computeBondTir(b); }).filter(Boolean);
     var costoRealTotal = tirResults.reduce(function(s,r){ return s+r.costoReal; }, 0);
     var tirPonderada = costoRealTotal ? tirResults.reduce(function(s,r){ return s + r.tir*r.costoReal; }, 0) / costoRealTotal : null;
+    var cargoTrimestralKpi = ultimoCargoTrimestral(hist);
+    var flujoNetoAnual = flujoAnual - cargoTrimestralKpi*4;
 
     els.swlKpis.innerHTML =
       '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">CAPITAL EN BONOS</div><div class="value">' + fmtMoney(totalValor) + '</div><div class="foot">' + bonos.length + ' instrumentos activos</div></div>' +
       '<div class="summary-card" style="--accent:var(--blue)"><div class="label">FLUJO ANUAL PROYECTADO</div><div class="value">' + fmtMoney(flujoAnual) + '</div><div class="foot">Cupones, próximos 12 meses (excluye devolución de capital)</div></div>' +
       '<div class="summary-card" style="--accent:var(--amber)"><div class="label">RENDIMIENTO CORRIENTE (SIMPLE)</div><div class="value">' + rentAnual.toFixed(1) + '%</div><div class="foot">Flujo anual / valor nominal — no ajustado por costos</div></div>' +
       '<div class="summary-card" style="--accent:var(--violet)"><div class="label">TIR PONDERADA DE CARTERA</div><div class="value" style="color:' + (tirPonderada!=null?'var(--violet)':'var(--text-dim)') + '">' + (tirPonderada!=null ? tirPonderada.toFixed(2)+'%' : '—') + '</div><div class="foot">' + (tirPonderada!=null ? tirResults.length + ' de ' + bonos.length + ' bonos con costo real cargado' : 'Carga el costo real en la pestaña "Costo Real & TIR"') + '</div></div>' +
-      '<div class="summary-card" style="--accent:var(--blue)"><div class="label">BASE DE COSTO REAL</div><div class="value">' + (costoRealTotal ? fmtMoney(costoRealTotal) : '—') + '</div><div class="foot">Nominal + comisión + ITBMS + interés acumulado pagado</div></div>';
+      '<div class="summary-card" style="--accent:var(--blue)"><div class="label">BASE DE COSTO REAL</div><div class="value">' + (costoRealTotal ? fmtMoney(costoRealTotal) : '—') + '</div><div class="foot">Nominal + comisión + ITBMS + interés acumulado pagado</div></div>' +
+      '<div class="summary-card" style="--accent:var(--red)"><div class="label">FLUJO NETO ANUAL (después de fees)</div><div class="value" style="color:var(--emerald)">' + fmtMoney(flujoNetoAnual) + '</div><div class="foot">' + (cargoTrimestralKpi>0 ? "− " + fmtMoney(cargoTrimestralKpi*4) + "/año en cargos de custodia (últ. real: " + fmtMoney(cargoTrimestralKpi) + "/trim.)" : "Sin cargos recurrentes detectados en el historial") + '</div></div>';
 
     buildSwlBonosTab(bonos, totalValor);
-    buildSwlFlujoTab(bonos, meses);
+    buildSwlFlujoTab(bonos, meses, hist, totalValor);
     buildSwlHistorialTab(hist);
     buildSwlCostosTab(bonos);
+  }
+
+  // cargo trimestral (custodia/manejo) más reciente reportado en el historial real de estados de cuenta —
+  // se usa como estimado para proyectar los próximos trimestres, ya que no hay forma de saber el monto exacto futuro de antemano
+  function ultimoCargoTrimestral(hist){
+    var conCargo = (hist||[]).filter(function(h){ return h.car > 0; }).slice().sort(function(a,b){ return a.per<b.per?1:-1; });
+    return conCargo.length ? conCargo[0].car : 0;
   }
 
   function buildSwlBonosTab(bonos, totalValor){
@@ -2479,7 +2489,7 @@
     els.swlBonosTable.innerHTML = head + rows + total;
   }
 
-  function buildSwlFlujoTab(bonos, meses){
+  function buildSwlFlujoTab(bonos, meses, hist, totalValor){
     var head = "<tr><th style='text-align:left'>Instrumento</th>" + meses.map(function(m){ return "<th>"+m+"</th>"; }).join("") + "<th>Anual</th></tr>";
     var totMes = new Array(12).fill(0), totCapital = new Array(12).fill(0), rows = "";
     bonos.forEach(function(b){
@@ -2503,19 +2513,38 @@
         rows += capRow;
       }
     });
-    var totCupRow = "<tr class='matrix-total'><td>TOTAL CUPONES</td>", totCapRow = "<tr class='matrix-capital' style='font-weight:800'><td>TOTAL DEVOLUCIÓN CAPITAL</td>", totFlujoRow = "<tr class='matrix-flujo-total'><td>FLUJO TOTAL</td>";
-    var totalAnualCup = 0, totalAnualCap = 0;
+
+    // cargo trimestral de custodia/manejo: se estima con el último monto real reportado en el historial (Oct/Ene/Abr/Jul, ciclo confirmado con datos reales)
+    var cargoTrimestral = ultimoCargoTrimestral(hist);
+    var totCargos = new Array(12).fill(0);
+    if(cargoTrimestral > 0){ [0,3,6,9].forEach(function(mi){ totCargos[mi] = cargoTrimestral; }); }
+
+    var totCupRow = "<tr class='matrix-total'><td>TOTAL CUPONES</td>",
+        totCapRow = "<tr class='matrix-capital' style='font-weight:800'><td>TOTAL DEVOLUCIÓN CAPITAL</td>",
+        totCargosRow = "<tr class='matrix-capital' style='color:var(--red)'><td>↳ Cargo trimestral estimado (custodia/manejo, últ. real: " + fmtMoney(cargoTrimestral) + ")</td>",
+        totFlujoRow = "<tr class='matrix-flujo-total'><td>FLUJO TOTAL (bruto)</td>",
+        netoRow = "<tr class='matrix-flujo-total' style='color:var(--emerald)'><td>FLUJO NETO (después de cargos)</td>",
+        capitalRestanteRow = "<tr style='color:var(--blue);font-weight:700'><td>CAPITAL NETO RESTANTE</td>";
+    var totalAnualCup = 0, totalAnualCap = 0, totalAnualCargos = 0, capitalRestante = totalValor;
     for(var mi=0; mi<12; mi++){
-      totalAnualCup += totMes[mi]; totalAnualCap += totCapital[mi];
+      totalAnualCup += totMes[mi]; totalAnualCap += totCapital[mi]; totalAnualCargos += totCargos[mi];
       totCupRow += "<td>" + (totMes[mi]>0?fmtMoney(totMes[mi]):"—") + "</td>";
       totCapRow += "<td>" + (totCapital[mi]>0?fmtMoney(totCapital[mi]):"—") + "</td>";
+      totCargosRow += "<td>" + (totCargos[mi]>0?("−"+fmtMoney(totCargos[mi])):"—") + "</td>";
       var ft = totMes[mi] + totCapital[mi];
       totFlujoRow += "<td>" + (ft>0?fmtMoney(ft):"—") + "</td>";
+      var neto = ft - totCargos[mi];
+      netoRow += "<td>" + (neto!==0?fmtMoney(neto):"—") + "</td>";
+      capitalRestante -= totCapital[mi];
+      capitalRestanteRow += "<td>" + (totCapital[mi]>0 ? fmtMoney(capitalRestante) : "—") + "</td>";
     }
     totCupRow += "<td>" + fmtMoney(totalAnualCup) + "</td></tr>";
     totCapRow += "<td>" + fmtMoney(totalAnualCap) + "</td></tr>";
+    totCargosRow += "<td style='color:var(--red)'>−" + fmtMoney(totalAnualCargos) + "</td></tr>";
     totFlujoRow += "<td>" + fmtMoney(totalAnualCup+totalAnualCap) + "</td></tr>";
-    els.swlFlujoTable.innerHTML = head + rows + totCupRow + totCapRow + totFlujoRow;
+    netoRow += "<td>" + fmtMoney(totalAnualCup+totalAnualCap-totalAnualCargos) + "</td></tr>";
+    capitalRestanteRow += "<td>" + fmtMoney(capitalRestante) + "</td></tr>";
+    els.swlFlujoTable.innerHTML = head + rows + totCupRow + totCapRow + totCargosRow + totFlujoRow + netoRow + capitalRestanteRow;
   }
 
   var swlHistYear = null;
