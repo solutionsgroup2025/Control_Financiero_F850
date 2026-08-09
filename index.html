@@ -512,13 +512,15 @@
       </div>
 
       <div class="page" id="page-jubilacion">
-        <div class="module-note">Este es el indicador clave para tu independencia financiera: cuánto dinero neto entra realmente a tu bolsillo cada mes, después de cargos y comisiones, sin contar capital que sigue invertido (como Fortesza).</div>
+        <div class="module-note">Este es el indicador clave para tu independencia financiera: cuánto dinero neto entra realmente a tu bolsillo, después de cargos y comisiones, sin contar capital que sigue invertido (como Fortesza).</div>
+
+        <div class="month-bar" id="flujoAnioSelector" style="margin-bottom:12px;"></div>
 
         <div class="kpi-grid-3" id="flujoKpis"></div>
 
         <div class="table-card">
           <div class="table-card-head">
-            <h3>Resumen Mensual de Ingresos al Bolsillo</h3>
+            <h3>Resumen Anual de Ingresos al Bolsillo</h3>
           </div>
           <table>
             <thead>
@@ -1223,6 +1225,7 @@
     pageSub: document.getElementById("pageSub"),
     flujoKpis: document.getElementById("flujoKpis"),
     flujoTableBody: document.getElementById("flujoTableBody"),
+    flujoAnioSelector: document.getElementById("flujoAnioSelector"),
     swlKpis: document.getElementById("swlKpis"),
     swlBonosTable: document.getElementById("swlBonosTable"),
     swlFlujoTable: document.getElementById("swlFlujoTable"),
@@ -2371,35 +2374,101 @@
   /* ---------- flujo al bolsillo / jubilación ---------- */
   function findInv(id){ return investments().find(function(a){ return a.id === id; }); }
 
+  var flujoAnioSel = null;
+
+  // suma un arreglo de periodos {per, ing, car} (bonosLocalesHistorial) filtrado por año
+  function sumHistArrayPorAnio(arr, anio){
+    var filtrado = (arr||[]).filter(function(h){ return h.per && h.per.slice(0,4) === anio; }).sort(function(a,b){ return a.per<b.per?-1:1; });
+    return {
+      bruto: filtrado.reduce(function(s,h){ return s+(h.ing||0); },0),
+      cargos: filtrado.reduce(function(s,h){ return s+(h.car||0); },0),
+      ultimoPer: filtrado.length ? filtrado[filtrado.length-1].per : null,
+      meses: filtrado.length
+    };
+  }
+  // igual, pero para pershingHistorial que es un objeto {per: {...}}, no un arreglo
+  function sumHistObjPorAnio(obj, anio){
+    var pers = Object.keys(obj||{}).filter(function(p){ return p.slice(0,4)===anio; }).sort();
+    return {
+      bruto: pers.reduce(function(s,p){ return s+(obj[p].ing||0); },0),
+      cargos: pers.reduce(function(s,p){ return s+(obj[p].car||0); },0),
+      ultimoPer: pers.length ? pers[pers.length-1] : null,
+      meses: pers.length
+    };
+  }
+
   function renderFlujo(){
     var sw = findInv("sweetwater"), pe = findInv("pershing"), prof = findInv("prof_edson"), un = findInv("unfcu");
     var inmuebles = backup.state.inmuebles || [];
     var apto = inmuebles.find(function(i){ return i.id === "apto"; });
-    var aptoCosto = apto ? (apto.gastosFijos||[]).reduce(function(s,g){ return s+(g.monto||0); },0) : 0;
+    var aptoCostoMensual = apto ? (apto.gastosFijos||[]).reduce(function(s,g){ return s+(g.monto||0); },0) : 0;
     var ftz = backup.state.fortesza;
 
-    function row(name, tipo, fm){
+    // años disponibles: cualquier año con datos reales en alguna fuente, más el año calendario actual — así la
+    // pestaña del año en curso (y del siguiente, cuando llegue) aparece sola, sin tener que tocar el código cada vez
+    var aniosSet = {};
+    (backup.state.bonosLocalesHistorial||[]).forEach(function(h){ if(h.per) aniosSet[h.per.slice(0,4)] = true; });
+    Object.keys(backup.state.pershingHistorial||{}).forEach(function(p){ aniosSet[p.slice(0,4)] = true; });
+    (apto && apto.alquileres || []).forEach(function(a){ if(a.per) aniosSet[a.per.slice(0,4)] = true; });
+    if(prof && prof.flujoMensual && prof.flujoMensual.per) aniosSet[prof.flujoMensual.per.slice(0,4)] = true;
+    if(un && un.flujoMensual && un.flujoMensual.per) aniosSet[un.flujoMensual.per.slice(0,4)] = true;
+    aniosSet[String(new Date().getFullYear())] = true;
+    var aniosLista = Object.keys(aniosSet).sort().reverse();
+    if(!flujoAnioSel || aniosLista.indexOf(flujoAnioSel) === -1) flujoAnioSel = aniosLista[0];
+
+    els.flujoAnioSelector.innerHTML = aniosLista.map(function(a){
+      return '<button class="month-btn' + (a===flujoAnioSel?' on':'') + '" data-anio="' + a + '">' + a + '</button>';
+    }).join("");
+    els.flujoAnioSelector.querySelectorAll(".month-btn").forEach(function(btn){
+      btn.addEventListener("click", function(){ flujoAnioSel = btn.getAttribute("data-anio"); renderFlujo(); });
+    });
+
+    var swAnio = sumHistArrayPorAnio(backup.state.bonosLocalesHistorial, flujoAnioSel);
+    var peAnio = sumHistObjPorAnio(backup.state.pershingHistorial, flujoAnioSel);
+
+    // Profuturo y UNFCU todavía no tienen historial mensual acumulable (solo el último dato cargado) —
+    // se muestra ese dato únicamente si cae dentro del año seleccionado, honestamente marcado como tal
+    function rowSnapshot(name, tipo, fm){
       fm = fm || {};
-      var bruto = fm.ing || 0, cargos = fm.car || 0;
-      return { name:name, tipo:tipo, bruto:bruto, cargos:cargos, neto:bruto-cargos, per:fm.per||"—" };
+      var enEsteAnio = fm.per && fm.per.slice(0,4) === flujoAnioSel;
+      var bruto = enEsteAnio ? (fm.ing||0) : 0, cargos = enEsteAnio ? (fm.car||0) : 0;
+      return { name:name, tipo:tipo, bruto:bruto, cargos:cargos, neto:bruto-cargos, per: enEsteAnio?fm.per:null, sinHistorico:true };
+    }
+    function rowAcumulado(name, tipo, agg){
+      return { name:name, tipo:tipo, bruto:agg.bruto, cargos:agg.cargos, neto:agg.bruto-agg.cargos, per:agg.ultimoPer, meses:agg.meses };
     }
 
+    var alquileresAnio = (apto && apto.alquileres || []).filter(function(a){ return a.per && a.per.slice(0,4)===flujoAnioSel; });
+    var aptoBruto = alquileresAnio.reduce(function(s,a){ return s+(a.monto||0); },0);
+    var hoy = new Date();
+    var mesesTranscurridos = (String(hoy.getFullYear())===flujoAnioSel) ? (hoy.getMonth()+1) : 12;
+    var aptoCargosEstimado = aptoCostoMensual * mesesTranscurridos;
+
     var rows = [
-      row("SW Local (bonos)", "Cupones", sw && sw.flujoMensual),
-      row("SW Pershing", "BlackRock + MM", pe && pe.flujoMensual),
-      row("Profuturo", "Réditos", prof && prof.flujoMensual),
-      row("UNFCU", "Interés", un && un.flujoMensual)
+      rowAcumulado("SW Local (bonos)", "Cupones", swAnio),
+      rowAcumulado("SW Pershing", "BlackRock + MM", peAnio),
+      rowSnapshot("Profuturo", "Réditos", prof && prof.flujoMensual),
+      rowSnapshot("UNFCU", "Interés", un && un.flujoMensual)
     ];
-    rows.push({ name:"Apartamento", tipo:"Alquiler", bruto:0, cargos:aptoCosto, neto:-aptoCosto, per:"Pendiente", pending:true });
+    rows.push({ name:"Apartamento", tipo:"Alquiler", bruto:aptoBruto, cargos:aptoCargosEstimado, neto:aptoBruto-aptoCargosEstimado, per:null, pending: alquileresAnio.length===0, estimadoCargos:true });
 
     var totBruto = rows.reduce(function(s,r){return s+r.bruto;},0);
     var totCargos = rows.reduce(function(s,r){return s+r.cargos;},0);
     var totNeto = rows.reduce(function(s,r){return s+r.neto;},0);
 
     var html = rows.map(function(r){
-      var badge = r.pending
-        ? '<span class="pill" style="background:' + hexToRgba("#f59e0b",0.15) + ';color:#f59e0b">Pendiente</span>'
-        : '<span class="pill" style="background:' + hexToRgba("#10b981",0.15) + ';color:#10b981">' + escapeHtml(r.per) + ' · PDF</span>';
+      var badge;
+      if(r.sinHistorico){
+        badge = r.per
+          ? '<span class="pill" style="background:' + hexToRgba("#7c93ad",0.18) + ';color:var(--text-muted)">Solo ' + escapeHtml(r.per) + ' (sin histórico)</span>'
+          : '<span class="pill" style="background:' + hexToRgba("#f59e0b",0.15) + ';color:#f59e0b">Sin datos ' + escapeHtml(flujoAnioSel) + '</span>';
+      } else if(r.pending){
+        badge = '<span class="pill" style="background:' + hexToRgba("#f59e0b",0.15) + ';color:#f59e0b">Sin alquiler registrado ' + escapeHtml(flujoAnioSel) + '</span>';
+      } else if(r.estimadoCargos){
+        badge = '<span class="pill" style="background:' + hexToRgba("#7c93ad",0.18) + ';color:var(--text-muted)">Cargos estimados</span>';
+      } else {
+        badge = '<span class="pill" style="background:' + hexToRgba("#10b981",0.15) + ';color:#10b981">' + (r.meses||0) + ' meses · hasta ' + escapeHtml(r.per||"—") + '</span>';
+      }
       var pctReditoRow = totBruto ? (r.bruto/totBruto*100) : 0;
       return '<tr>' +
         '<td class="name">' + escapeHtml(r.name) + '</td>' +
@@ -2412,7 +2481,7 @@
       '</tr>';
     }).join("");
 
-    html += '<tr class="total-row"><td colspan="2" style="text-align:right">TOTAL NETO AL BOLSILLO</td>' +
+    html += '<tr class="total-row"><td colspan="2" style="text-align:right">TOTAL NETO AL BOLSILLO ' + escapeHtml(flujoAnioSel) + '</td>' +
       '<td class="num">' + fmtMoney(totBruto) + '</td>' +
       '<td class="num" style="color:var(--red)">-' + fmtMoney(totCargos) + '</td>' +
       '<td class="num" style="font-size:15px;color:' + (totNeto>=0?"var(--emerald)":"var(--red)") + '">' + fmtMoney(totNeto) + '</td>' +
@@ -2429,15 +2498,13 @@
 
     els.flujoTableBody.innerHTML = html;
 
-    var ingresoAnual = totNeto * 12;
-    var swAnualCupones = (backup.state.bonosLocales||[]).reduce(function(s,b){
-      return s + (b.flujo||[]).reduce(function(a,v){ return a+v; },0);
-    },0);
+    var mesesConDatos = Math.max(swAnio.meses, peAnio.meses, 1);
+    var promedioMensual = totNeto / mesesConDatos;
 
     els.flujoKpis.innerHTML =
-      '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">INGRESO NETO MENSUAL</div><div class="value">' + fmtMoney(totNeto) + '</div><div class="foot">Al bolsillo, después de cargos</div></div>' +
-      '<div class="summary-card" style="--accent:var(--blue)"><div class="label">INGRESO ANUAL PROYECTADO</div><div class="value">' + fmtMoney(ingresoAnual) + '</div><div class="foot">Neto mensual × 12</div></div>' +
-      '<div class="summary-card" style="--accent:var(--amber)"><div class="label">FLUJO ANUAL CUPONES SW LOCAL</div><div class="value">' + fmtMoney(swAnualCupones) + '</div><div class="foot">Proyección 12 meses de bonos locales</div></div>';
+      '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">INGRESO NETO ACUMULADO ' + escapeHtml(flujoAnioSel) + '</div><div class="value">' + fmtMoney(totNeto) + '</div><div class="foot">Al bolsillo, después de cargos, lo que va del año</div></div>' +
+      '<div class="summary-card" style="--accent:var(--blue)"><div class="label">PROMEDIO MENSUAL ' + escapeHtml(flujoAnioSel) + '</div><div class="value">' + fmtMoney(promedioMensual) + '</div><div class="foot">Neto acumulado / ' + mesesConDatos + ' mes(es) con datos</div></div>' +
+      '<div class="summary-card" style="--accent:var(--amber)"><div class="label">CUPONES SW LOCAL ' + escapeHtml(flujoAnioSel) + '</div><div class="value">' + fmtMoney(swAnio.bruto) + '</div><div class="foot">' + swAnio.meses + ' mes(es) cargados, lo que va del año</div></div>';
   }
 
   /* ---------- Sweetwater Local (bonos, renta fija) ---------- */
