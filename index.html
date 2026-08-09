@@ -525,9 +525,10 @@
               <tr>
                 <th>Fuente</th>
                 <th>Tipo</th>
-                <th class="num">Bruto</th>
+                <th class="num">Réditos Brutos</th>
                 <th class="num">Cargos</th>
                 <th class="num">Neto en Bolsillo</th>
+                <th class="num">% Rédito</th>
                 <th>Período / Estado</th>
               </tr>
             </thead>
@@ -2399,12 +2400,14 @@
       var badge = r.pending
         ? '<span class="pill" style="background:' + hexToRgba("#f59e0b",0.15) + ';color:#f59e0b">Pendiente</span>'
         : '<span class="pill" style="background:' + hexToRgba("#10b981",0.15) + ';color:#10b981">' + escapeHtml(r.per) + ' · PDF</span>';
+      var pctReditoRow = totBruto ? (r.bruto/totBruto*100) : 0;
       return '<tr>' +
         '<td class="name">' + escapeHtml(r.name) + '</td>' +
         '<td>' + escapeHtml(r.tipo) + '</td>' +
         '<td class="num">' + (r.bruto>0 ? fmtMoney(r.bruto) : "—") + '</td>' +
         '<td class="num" style="color:' + (r.cargos>0?"var(--red)":"var(--text-muted)") + '">' + (r.cargos>0 ? "-"+fmtMoney(r.cargos) : "$0.00") + '</td>' +
         '<td class="num" style="font-weight:700;color:' + (r.neto>=0?"var(--emerald)":"var(--red)") + '">' + fmtMoney(r.neto) + '</td>' +
+        '<td class="num">' + (r.bruto>0 ? pctReditoRow.toFixed(1)+"%" : "—") + '</td>' +
         '<td>' + badge + '</td>' +
       '</tr>';
     }).join("");
@@ -2413,12 +2416,14 @@
       '<td class="num">' + fmtMoney(totBruto) + '</td>' +
       '<td class="num" style="color:var(--red)">-' + fmtMoney(totCargos) + '</td>' +
       '<td class="num" style="font-size:15px;color:' + (totNeto>=0?"var(--emerald)":"var(--red)") + '">' + fmtMoney(totNeto) + '</td>' +
+      '<td class="num">100.0%</td>' +
       '<td></td></tr>';
 
     if(ftz && ftz.resumen){
       html += '<tr class="info-row"><td class="name" style="color:var(--text)">Fortesza (factoring)</td><td>Retorno facturas</td>' +
         '<td class="num">—</td><td class="num">$0.00</td>' +
         '<td class="num" style="color:var(--amber);font-style:normal;font-weight:700">' + fmtMoney(ftz.resumen.capitalActivoActual) + ' activo</td>' +
+        '<td class="num">—</td>' +
         '<td><span class="pill" style="background:' + hexToRgba("#7c93ad",0.18) + ';color:var(--text-muted)">' + escapeHtml(ftz.datosAl||"") + '</span></td></tr>';
     }
 
