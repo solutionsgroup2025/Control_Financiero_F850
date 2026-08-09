@@ -2450,8 +2450,10 @@
     var tirPonderada = costoRealTotal ? tirResults.reduce(function(s,r){ return s + r.tir*r.costoReal; }, 0) / costoRealTotal : null;
     var cargoTrimestralKpi = ultimoCargoTrimestral(hist);
     var flujoNetoAnual = flujoAnual - cargoTrimestralKpi*4;
+    var efectivo = backup.state.bonosLocalesEfectivo;
 
     els.swlKpis.innerHTML =
+      (efectivo ? '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">EFECTIVO EN CUENTA</div><div class="value">' + fmtMoney(efectivo.monto) + '</div><div class="foot">Según estado de cuenta al ' + escapeHtml(efectivo.fecha) + '</div></div>' : '') +
       '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">CAPITAL EN BONOS</div><div class="value">' + fmtMoney(totalValor) + '</div><div class="foot">' + bonos.length + ' instrumentos activos</div></div>' +
       '<div class="summary-card" style="--accent:var(--blue)"><div class="label">FLUJO ANUAL PROYECTADO</div><div class="value">' + fmtMoney(flujoAnual) + '</div><div class="foot">Cupones, próximos 12 meses (excluye devolución de capital)</div></div>' +
       '<div class="summary-card" style="--accent:var(--amber)"><div class="label">RENDIMIENTO CORRIENTE (SIMPLE)</div><div class="value">' + rentAnual.toFixed(1) + '%</div><div class="foot">Flujo anual / valor nominal — no ajustado por costos</div></div>' +
