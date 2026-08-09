@@ -542,6 +542,7 @@
             <button class="tab-btn on" data-tab="bonos">Bonos</button>
             <button class="tab-btn" data-tab="flujo">Proyección Próximos 12 Meses</button>
             <button class="tab-btn" data-tab="historial">Historial</button>
+            <button class="tab-btn" data-tab="costos">Costo Real &amp; TIR</button>
           </div>
 
           <div class="tab-panel on" data-panel="bonos" id="swlPanelBonos">
@@ -561,6 +562,16 @@
             <div class="matrix-wrap">
               <table class="matrix" id="swlHistorialTable" style="font-size:12.5px;"></table>
             </div>
+          </div>
+
+          <div class="tab-panel" data-panel="costos" id="swlPanelCostos">
+            <div class="module-note" style="margin-bottom:12px;">
+              Ingresa el precio de compra, comisión, ITBMS e interés acumulado pagado de cada bono para calcular la base de costo real y la TIR (rendimiento al vencimiento) de cada instrumento. Los campos vacíos se ignoran — no afectan al resto del tablero.
+            </div>
+            <div class="matrix-wrap">
+              <table class="matrix" id="swlCostosTable" style="font-size:12.5px;"></table>
+            </div>
+            <div class="form-actions" style="margin-top:14px;"><button type="button" class="btn btn-primary" id="btnSaveSwlCostos">Guardar Costos de Adquisición</button></div>
           </div>
         </div>
       </div>
@@ -1213,6 +1224,8 @@
     swlBonosTable: document.getElementById("swlBonosTable"),
     swlFlujoTable: document.getElementById("swlFlujoTable"),
     swlHistorialTable: document.getElementById("swlHistorialTable"),
+    swlCostosTable: document.getElementById("swlCostosTable"),
+    btnSaveSwlCostos: document.getElementById("btnSaveSwlCostos"),
     swlHistYearSelector: document.getElementById("swlHistYearSelector"),
     swpMonths: document.getElementById("swpMonths"),
     swpConsNote: document.getElementById("swpConsNote"),
@@ -2432,14 +2445,21 @@
     var rentAnual = totalValor ? (flujoAnual/totalValor*100) : 0;
     var proximoBono = bonos.slice().filter(function(b){return !b.alerta;}).sort(function(a,b){return (a.montoProximo||0) < (b.montoProximo||0) ? 1 : -1;})[0];
 
+    var tirResults = bonos.map(function(b){ return computeBondTir(b); }).filter(Boolean);
+    var costoRealTotal = tirResults.reduce(function(s,r){ return s+r.costoReal; }, 0);
+    var tirPonderada = costoRealTotal ? tirResults.reduce(function(s,r){ return s + r.tir*r.costoReal; }, 0) / costoRealTotal : null;
+
     els.swlKpis.innerHTML =
       '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">CAPITAL EN BONOS</div><div class="value">' + fmtMoney(totalValor) + '</div><div class="foot">' + bonos.length + ' instrumentos activos</div></div>' +
-      '<div class="summary-card" style="--accent:var(--blue)"><div class="label">FLUJO ANUAL PROYECTADO</div><div class="value">' + fmtMoney(flujoAnual) + '</div><div class="foot">Cupones, próximos 12 meses</div></div>' +
-      '<div class="summary-card" style="--accent:var(--amber)"><div class="label">RENTABILIDAD ANUAL PROMEDIO</div><div class="value">' + rentAnual.toFixed(1) + '%</div><div class="foot">Flujo anual / capital en bonos</div></div>';
+      '<div class="summary-card" style="--accent:var(--blue)"><div class="label">FLUJO ANUAL PROYECTADO</div><div class="value">' + fmtMoney(flujoAnual) + '</div><div class="foot">Cupones, próximos 12 meses (excluye devolución de capital)</div></div>' +
+      '<div class="summary-card" style="--accent:var(--amber)"><div class="label">RENDIMIENTO CORRIENTE (SIMPLE)</div><div class="value">' + rentAnual.toFixed(1) + '%</div><div class="foot">Flujo anual / valor nominal — no ajustado por costos</div></div>' +
+      '<div class="summary-card" style="--accent:var(--violet)"><div class="label">TIR PONDERADA DE CARTERA</div><div class="value" style="color:' + (tirPonderada!=null?'var(--violet)':'var(--text-dim)') + '">' + (tirPonderada!=null ? tirPonderada.toFixed(2)+'%' : '—') + '</div><div class="foot">' + (tirPonderada!=null ? tirResults.length + ' de ' + bonos.length + ' bonos con costo real cargado' : 'Carga el costo real en la pestaña "Costo Real & TIR"') + '</div></div>' +
+      '<div class="summary-card" style="--accent:var(--blue)"><div class="label">BASE DE COSTO REAL</div><div class="value">' + (costoRealTotal ? fmtMoney(costoRealTotal) : '—') + '</div><div class="foot">Nominal + comisión + ITBMS + interés acumulado pagado</div></div>';
 
     buildSwlBonosTab(bonos, totalValor);
     buildSwlFlujoTab(bonos, meses);
     buildSwlHistorialTab(hist);
+    buildSwlCostosTab(bonos);
   }
 
   function buildSwlBonosTab(bonos, totalValor){
@@ -2524,6 +2544,123 @@
     var totRow = "<tr class='matrix-total'><td>TOTAL " + escapeHtml(swlHistYear) + "</td><td></td><td style='color:var(--emerald)'>" + fmtMoney(totIng) + "</td><td style='color:var(--red)'>" + fmtMoney(totCar) + "</td></tr>";
     els.swlHistorialTable.innerHTML = head + (rows || "<tr><td colspan='4' style='text-align:center;color:var(--text-dim);padding:18px;'>Sin registros para " + escapeHtml(swlHistYear) + ".</td></tr>") + totRow;
   }
+
+  /* ---------- SW Local: Costo Real de Adquisición y TIR/YTM ---------- */
+  function parseDMY(str){
+    if(!str) return null;
+    var parts = String(str).split("/");
+    if(parts.length !== 3) return null;
+    var d = new Date(Number(parts[2]), Number(parts[1])-1, Number(parts[0]));
+    return isNaN(d.getTime()) ? null : d;
+  }
+  function addMonths(date, n){
+    var d = new Date(date.getTime());
+    d.setMonth(d.getMonth() + n);
+    return d;
+  }
+  // frecuencia de pago (pagos/año) y monto de cupón periódico, inferidos de los 12 meses de flujo ya cargados
+  function inferCouponSchedule(bono){
+    var flujo = bono.flujo || [];
+    var nonZero = flujo.filter(function(v){ return v > 0; });
+    if(!nonZero.length) return null;
+    var freq = nonZero.length;
+    var avgCoupon = nonZero.reduce(function(a,b){ return a+b; }, 0) / nonZero.length;
+    return { freq: freq, avgCoupon: avgCoupon };
+  }
+  // genera las fechas de cupón entre fechaCompra (exclusiva) y vencimiento (inclusiva), ancladas al vencimiento
+  function buildCouponDates(fechaCompra, vencimiento, freq){
+    var stepMonths = 12 / freq;
+    var dates = [];
+    var d = new Date(vencimiento.getTime());
+    var guard = 0;
+    while(d > fechaCompra && guard < 400){
+      dates.unshift(new Date(d.getTime()));
+      d = addMonths(d, -stepMonths);
+      guard++;
+    }
+    return dates;
+  }
+  // TIR anualizada (estilo XIRR) por bisección + Newton, sobre flujos {date, amount}
+  function xirr(flows){
+    if(!flows || flows.length < 2) return null;
+    var t0 = flows[0].date.getTime();
+    function years(d){ return (d.getTime() - t0) / (1000*60*60*24*365); }
+    function npv(rate){
+      return flows.reduce(function(s,f){ return s + f.amount / Math.pow(1+rate, years(f.date)); }, 0);
+    }
+    var lo = -0.9, hi = 5, flo = npv(lo), fhi = npv(hi);
+    if(!isFinite(flo) || !isFinite(fhi) || flo*fhi > 0) return null;
+    var mid = 0;
+    for(var i=0; i<200; i++){
+      mid = (lo+hi)/2;
+      var fmid = npv(mid);
+      if(Math.abs(fmid) < 0.01) break;
+      if(flo*fmid < 0){ hi = mid; fhi = fmid; } else { lo = mid; flo = fmid; }
+    }
+    return mid;
+  }
+  // calcula costo real y TIR de un bono dado su costoAdquisicion (precioCompra %, comision, itbms, interesAcumulado, fechaCompra)
+  function computeBondTir(bono){
+    var c = bono.costoAdquisicion;
+    if(!c || !c.fechaCompra) return null;
+    var fechaCompra = parseDMY(c.fechaCompra);
+    var vencimiento = parseDMY(bono.vencimiento);
+    if(!fechaCompra || !vencimiento || vencimiento <= fechaCompra) return null;
+    var sched = inferCouponSchedule(bono);
+    if(!sched) return null;
+    var precioCompra = c.precioCompra != null ? c.precioCompra : 100;
+    var costoReal = round2((bono.valor||0) * precioCompra/100 + (c.comision||0) + (c.itbms||0) + (c.interesAcumulado||0));
+    if(costoReal <= 0) return null;
+    var couponDates = buildCouponDates(fechaCompra, vencimiento, sched.freq);
+    if(!couponDates.length) return null;
+    var flows = [{ date: fechaCompra, amount: -costoReal }];
+    couponDates.forEach(function(d, i){
+      var amt = sched.avgCoupon;
+      if(i === couponDates.length - 1) amt += (bono.valor || 0);
+      flows.push({ date: d, amount: amt });
+    });
+    var rate = xirr(flows);
+    if(rate == null) return null;
+    return { costoReal: costoReal, tir: rate*100 };
+  }
+
+  function buildSwlCostosTab(bonos){
+    var head = "<tr><th style='text-align:left'>Instrumento</th><th>Fecha Compra</th><th>Precio Compra (%)</th><th>Comisión ($)</th><th>ITBMS ($)</th><th>Interés Acum. Pagado ($)</th><th>Costo Real</th><th>TIR</th></tr>";
+    var rows = bonos.map(function(b, idx){
+      var c = b.costoAdquisicion || {};
+      var result = computeBondTir(b);
+      return "<tr>" +
+        "<td><div style='font-weight:700'>" + escapeHtml(b.nombre) + "</div><div style='font-size:10px;color:var(--text-dim)'>" + escapeHtml(b.codigo) + "</div></td>" +
+        "<td><input type='text' data-idx='" + idx + "' data-field='fechaCompra' placeholder='dd/mm/aaaa' value='" + escapeHtml(c.fechaCompra||"") + "' style='width:100px;'></td>" +
+        "<td><input type='number' step='0.01' data-idx='" + idx + "' data-field='precioCompra' placeholder='100.00' value='" + (c.precioCompra!=null?c.precioCompra:"") + "' style='width:80px;'></td>" +
+        "<td><input type='number' step='0.01' data-idx='" + idx + "' data-field='comision' placeholder='0.00' value='" + (c.comision!=null?c.comision:"") + "' style='width:80px;'></td>" +
+        "<td><input type='number' step='0.01' data-idx='" + idx + "' data-field='itbms' placeholder='0.00' value='" + (c.itbms!=null?c.itbms:"") + "' style='width:80px;'></td>" +
+        "<td><input type='number' step='0.01' data-idx='" + idx + "' data-field='interesAcumulado' placeholder='0.00' value='" + (c.interesAcumulado!=null?c.interesAcumulado:"") + "' style='width:90px;'></td>" +
+        "<td>" + (result ? fmtMoney(result.costoReal) : "—") + "</td>" +
+        "<td style='font-weight:700;color:" + (result?"var(--emerald)":"var(--text-dim)") + "'>" + (result ? result.tir.toFixed(2)+"%" : "—") + "</td>" +
+      "</tr>";
+    }).join("");
+    els.swlCostosTable.innerHTML = head + rows;
+  }
+
+  els.btnSaveSwlCostos && els.btnSaveSwlCostos.addEventListener("click", function(){
+    var bonos = backup.state.bonosLocales || [];
+    els.swlCostosTable.querySelectorAll("input[data-idx]").forEach(function(input){
+      var idx = Number(input.getAttribute("data-idx"));
+      var field = input.getAttribute("data-field");
+      var bono = bonos[idx];
+      if(!bono) return;
+      if(!bono.costoAdquisicion) bono.costoAdquisicion = {};
+      if(field === "fechaCompra"){
+        bono.costoAdquisicion.fechaCompra = input.value.trim() || null;
+      } else {
+        bono.costoAdquisicion[field] = input.value === "" ? null : parseFloat(input.value);
+      }
+    });
+    setDirty(true);
+    renderSwLocal();
+    showToast("Costos de adquisición guardados.");
+  });
 
   /* ---------- Sweetwater Pershing (multi-activo internacional) ---------- */
   var swpCurPer = null;
