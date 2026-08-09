@@ -2561,14 +2561,14 @@
       "</tr>";
     }).join("");
     var rowsPagados = bonosPagados.map(function(b){
-      return "<tr style='opacity:0.55;'>" +
-        "<td><div style='font-weight:700;color:var(--text-dim);text-decoration:line-through;'>" + escapeHtml(b.nombre) + "</div><div style='font-size:10px;color:var(--text-dim)'>" + escapeHtml(b.codigo) + " · PAGADO</div></td>" +
-        "<td style='color:var(--text-dim)'>(" + fmtMoney(b.valor) + ")</td>" +
-        "<td style='color:var(--text-dim)'>" + escapeHtml(b.tasa) + "</td>" +
-        "<td style='color:var(--text-dim)'>—</td>" +
-        "<td style='color:var(--text-dim)'>" + escapeHtml(b.vencimiento) + "</td>" +
-        "<td style='color:var(--text-dim)'>" + escapeHtml(b.proximoCupon||"—") + "</td>" +
-        "<td style='color:var(--text-dim)'>—</td>" +
+      return "<tr style='background:" + hexToRgba("#f59e0b",0.08) + ";'>" +
+        "<td><div style='font-weight:700;color:var(--amber);text-decoration:line-through;'>⚠️ " + escapeHtml(b.nombre) + "</div><div style='font-size:10px;color:var(--amber)'>" + escapeHtml(b.codigo) + " · PAGADO</div></td>" +
+        "<td style='color:var(--amber);font-weight:700;'>(" + fmtMoney(b.valor) + ")</td>" +
+        "<td style='color:var(--amber)'>" + escapeHtml(b.tasa) + "</td>" +
+        "<td style='color:var(--amber)'>—</td>" +
+        "<td style='color:var(--amber)'>" + escapeHtml(b.vencimiento) + "</td>" +
+        "<td style='color:var(--amber)'>" + escapeHtml(b.proximoCupon||"—") + "</td>" +
+        "<td style='color:var(--amber)'>—</td>" +
       "</tr>";
     }).join("");
     var total = "<tr class='matrix-total'><td>TOTAL ACTIVO</td><td>" + fmtMoney(totalValor) + "</td><td colspan='5'></td></tr>";
