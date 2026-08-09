@@ -2671,19 +2671,24 @@
     });
 
     var filtered = hist.filter(function(h){ return h.per.slice(0,4) === swlHistYear; });
-    var head = "<tr><th style='text-align:left'>Periodo</th><th>Total</th><th>Ingresos</th><th>Cargos</th></tr>";
+    var head = "<tr><th style='text-align:left'>Periodo</th><th>Total</th><th>Ingresos</th><th>Cargos</th><th>Total Neto</th><th>% Rendimiento</th></tr>";
     var rows = filtered.slice().sort(function(a,b){ return a.per<b.per?1:-1; }).map(function(h){
       var detLines = [];
       (h.ingresosLineas||[]).forEach(function(l){ if(l.monto) detLines.push("<div style='color:var(--emerald)'>+" + fmtMoney(l.monto) + " " + escapeHtml(l.descripcion||"Ingreso") + "</div>"); });
       (h.cargosLineas||[]).forEach(function(l){ if(l.monto) detLines.push("<div style='color:var(--red)'>−" + fmtMoney(Math.abs(l.monto)) + " " + escapeHtml(l.descripcion||"Cargo") + "</div>"); });
       var detHtml = detLines.length ? "<div style='font-size:10px;margin-top:4px;line-height:1.6;'>" + detLines.join("") + "</div>" : "";
+      var netoH = (h.ing||0) - (h.car||0);
+      var rendH = h.total ? (netoH/h.total*100) : 0;
       return "<tr><td>" + escapeHtml(h.per) + detHtml + "</td><td>" + fmtMoney(h.total) + "</td>" +
         "<td style='color:var(--emerald)'>" + (h.ing>0?fmtMoney(h.ing):"—") + "</td>" +
-        "<td style='color:" + (h.car>0?"var(--red)":"var(--text-dim)") + "'>" + (h.car>0?fmtMoney(h.car):"—") + "</td></tr>";
+        "<td style='color:" + (h.car>0?"var(--red)":"var(--text-dim)") + "'>" + (h.car>0?fmtMoney(h.car):"—") + "</td>" +
+        "<td style='color:" + (netoH>=0?"var(--emerald)":"var(--red)") + ";font-weight:700'>" + (netoH>=0?"+":"") + fmtMoney(netoH) + "</td>" +
+        "<td style='color:" + (rendH>=0?"var(--emerald)":"var(--red)") + "'>" + rendH.toFixed(2) + "%</td></tr>";
     }).join("");
     var totIng = filtered.reduce(function(s,h){ return s+(h.ing||0); },0);
     var totCar = filtered.reduce(function(s,h){ return s+(h.car||0); },0);
-    var totRow = "<tr class='matrix-total'><td>TOTAL " + escapeHtml(swlHistYear) + "</td><td></td><td style='color:var(--emerald)'>" + fmtMoney(totIng) + "</td><td style='color:var(--red)'>" + fmtMoney(totCar) + "</td></tr>";
+    var totNeto = totIng - totCar;
+    var totRow = "<tr class='matrix-total'><td>TOTAL " + escapeHtml(swlHistYear) + "</td><td></td><td style='color:var(--emerald)'>" + fmtMoney(totIng) + "</td><td style='color:var(--red)'>" + fmtMoney(totCar) + "</td><td style='color:" + (totNeto>=0?"var(--emerald)":"var(--red)") + "'>" + (totNeto>=0?"+":"") + fmtMoney(totNeto) + "</td><td></td></tr>";
     els.swlHistorialTable.innerHTML = head + (rows || "<tr><td colspan='4' style='text-align:center;color:var(--text-dim);padding:18px;'>Sin registros para " + escapeHtml(swlHistYear) + ".</td></tr>") + totRow;
   }
 
