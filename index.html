@@ -3057,8 +3057,10 @@
     var otrasTrans = d.otrasTransacciones || 0;
     var impRetenidos = d.impuestosRetenidos || 0;
     var ingNetos = d.ingresosNetos != null ? d.ingresosNetos : (d.ing||0) - (d.car||0) - otrasTrans - impRetenidos;
+    var valorPortafolio = (d.total||0) - (d.depositos||0) - ingNetos;
     els.swpKpis.innerHTML =
       '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">VALOR TOTAL</div><div class="value">' + fmtMoney(d.total) + '</div><div class="foot">' + escapeHtml(per) + '</div></div>' +
+      '<div class="summary-card" style="--accent:var(--violet)"><div class="label">VALOR DEL PORTAFOLIO</div><div class="value">' + fmtMoney(valorPortafolio) + '</div><div class="foot">Instrumentos, sin dividendos del mes (Valor Inicial + Cambio Neto)</div></div>' +
       '<div class="summary-card" style="--accent:var(--blue)"><div class="label">INGRESOS BRUTOS</div><div class="value">' + fmtMoney(d.ing) + '</div><div class="foot">Cargos: ' + fmtMoney(d.car) + (otrasTrans ? ' · Otras trans.: ' + fmtMoney(otrasTrans) : '') + (impRetenidos ? ' · Imp. retenidos: ' + fmtMoney(impRetenidos) : '') + '</div></div>' +
       '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">INGRESOS NETOS</div><div class="value" style="color:var(--emerald)">' + fmtMoney(ingNetos) + '</div><div class="foot">Lo que realmente entra al bolsillo, después de cargos y otras transacciones</div></div>' +
       '<div class="summary-card" style="--accent:' + (chg>=0?'var(--emerald)':'var(--red)') + '"><div class="label">CAMBIO NETO (MERCADO)</div><div class="value" style="color:' + (chg>=0?'var(--emerald)':'var(--red)') + '">' + (chg>=0?'+':'') + fmtMoney(chg) + '</div><div class="foot">' + (prevPer ? 'vs ' + escapeHtml(prevPer) : '') + ' — variación de precio, sin efectivo</div></div>';
