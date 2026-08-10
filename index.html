@@ -2966,6 +2966,64 @@
   }
   function round2(n){ return Math.round((n||0)*100)/100; }
 
+  // Dos conceptos separados, replicando la hoja de calculo de referencia del usuario:
+  // 1) Portafolio: Saldo Inicial + Depositos = Total Invertido (costo acumulado); Cambio Mercado = variacion de precio del periodo;
+  //    G/P Instrumento = Total Invertido + Cambio Mercado; Rendimiento = Cambio Mercado / Total Invertido.
+  // 2) Ingresos: Dividendos - Cargos = Ingresos Neto; Rendimiento = Ingresos Neto / Total Invertido.
+  // Ambos tracks son independientes entre si (el Cambio Mercado nunca se mezcla con los ingresos, ni viceversa).
+  function fmtPct1(v){ return v!=null ? (v*100).toFixed(1) + "%" : "—"; }
+  function pctColor(v){ return v==null ? "var(--text-dim)" : (v>=0?"var(--emerald)":"var(--red)"); }
+  function signMoney(v){ return (v>=0?"+":"") + fmtMoney(v); }
+
+  function buildSwpAnualRows(yearsMap, years){
+    var totalInvertidoAcum = 0;
+    return years.map(function(y){
+      var r = yearsMap[y].resumen;
+      var saldoInicial = totalInvertidoAcum;
+      var depositos = r.depositos || 0;
+      totalInvertidoAcum = round2(saldoInicial + depositos);
+      var totalInvertido = totalInvertidoAcum;
+      var cambioMercado = r.cambioNeto || 0;
+      var gpInstrumento = round2(totalInvertido + cambioMercado);
+      var rendPortafolio = totalInvertido ? (cambioMercado/totalInvertido) : null;
+      var dividendos = r.dividendos || 0;
+      var cargos = r.cargos || 0;
+      var ingresoNetoAnual = round2(dividendos + cargos);
+      var rendIngresos = totalInvertido ? (ingresoNetoAnual/totalInvertido) : null;
+      return { y:y, derivadoDeHistorial:r.derivadoDeHistorial, saldoInicial:saldoInicial, depositos:depositos||null,
+        totalInvertido:totalInvertido, cambioMercado:cambioMercado, gpInstrumento:gpInstrumento, rendPortafolio:rendPortafolio,
+        dividendos:dividendos, cargos:cargos, ingresoNetoAnual:ingresoNetoAnual, rendIngresos:rendIngresos };
+    });
+  }
+
+  function buildSwpMonthlyLedger(yearsMap, years){
+    var ledger = {};
+    var totalAcum = 0;
+    years.forEach(function(y){
+      ledger[y] = {};
+      var meses = yearsMap[y].meses || {};
+      SWP_CONS_MESES.forEach(function(m){
+        var e = meses[m];
+        if(!e) return;
+        var saldoAnterior = totalAcum;
+        var depositos = e.depositos || 0;
+        totalAcum = round2(totalAcum + depositos);
+        var totalInversion = totalAcum;
+        var cambioMercado = e.cambioNeto || 0;
+        var gpPortafolio = round2(totalInversion + cambioMercado);
+        var rendPortafolio = totalInversion ? (cambioMercado/totalInversion) : null;
+        var dividendos = e.dividendos || 0;
+        var cargos = e.cargos || 0;
+        var ingresosNetosMensual = round2(dividendos + cargos);
+        var rendIngresos = totalInversion ? (ingresosNetosMensual/totalInversion) : null;
+        ledger[y][m] = { saldoAnterior:saldoAnterior, depositos:depositos||null, totalInversion:totalInversion,
+          cambioMercado:cambioMercado, gpPortafolio:gpPortafolio, rendPortafolio:rendPortafolio,
+          dividendos:dividendos, cargos:cargos, ingresosNetosMensual:ingresosNetosMensual, rendIngresos:rendIngresos };
+      });
+    });
+    return ledger;
+  }
+
   function renderPershingConsolidado(){
     var yearsMap = buildConsolidatedYears();
     if(!Object.keys(yearsMap).length){
@@ -2976,22 +3034,24 @@
       return;
     }
     var cons = backup.state.pershingConsolidado;
-    els.swpConsNote.textContent = "Extracto real de la cuenta Pershing (" + (cons&&cons.fuente||"") + " + historial mensual cargado). \"Saldo\" es el valor tal como aparece en el estado de cuenta mensual de origen — algunos meses reflejan el saldo de apertura del mes. Los años marcados con * se calculan a partir del historial mensual cargado por el motor de ingesta (no tienen \"Depósitos\" separados salvo que se hayan registrado explícitamente).";
+    els.swpConsNote.textContent = "Extracto real de la cuenta Pershing (" + (cons&&cons.fuente||"") + " + historial mensual cargado). Dos rendimientos independientes: el del Portafolio (variacion de precio de los instrumentos vs. capital invertido) y el de Ingresos (dividendos netos de cargos vs. capital invertido). Los años marcados con * se calculan a partir del historial mensual cargado por el motor de ingesta.";
 
     var years = Object.keys(yearsMap).sort();
-    var head = "<tr><th style='text-align:left'>Año</th><th>Depósitos</th><th>Dividendos</th><th>Cargos</th><th>Cambio de Mercado</th><th>Ganancia/Pérdida Neta</th><th>Rendimiento</th></tr>";
-    var rows = years.map(function(y){
-      var r = yearsMap[y].resumen;
-      var rpVal = r.rendimientoPctSuma;
-      var rp = rpVal != null ? (rpVal*100).toFixed(1) + "%" : "—";
-      var yLabel = escapeHtml(y) + (r.derivadoDeHistorial ? " *" : "");
+    var anualRows = buildSwpAnualRows(yearsMap, years);
+    var head = "<tr><th style='text-align:left'>Año</th><th>Saldo Inicial</th><th>Depósitos</th><th>Total Invertido</th><th>Cambio Mercado</th><th>G/P Instrumento</th><th>Rendimiento</th><th>Dividendos</th><th>Cargos</th><th>Ingresos Neto Anual</th><th>Rendimiento</th></tr>";
+    var rows = anualRows.map(function(a){
+      var yLabel = escapeHtml(a.y) + (a.derivadoDeHistorial ? " *" : "");
       return "<tr><td style='text-align:left;font-weight:700;color:var(--text)'>" + yLabel + "</td>" +
-        "<td>" + (r.depositos!=null?fmtMoney(r.depositos):"—") + "</td>" +
-        "<td style='color:var(--emerald)'>" + fmtMoney(r.dividendos) + "</td>" +
-        "<td style='color:var(--red)'>" + fmtMoney(r.cargos) + "</td>" +
-        "<td style='color:" + ((r.cambioNeto||0)>=0?"var(--emerald)":"var(--red)") + "'>" + ((r.cambioNeto||0)>=0?"+":"") + fmtMoney(r.cambioNeto) + "</td>" +
-        "<td style='font-weight:700;color:" + ((r.gananciaPerdida||0)>=0?"var(--emerald)":"var(--red)") + "'>" + ((r.gananciaPerdida||0)>=0?"+":"") + fmtMoney(r.gananciaPerdida) + "</td>" +
-        "<td style='font-weight:700;color:" + (rpVal==null?"var(--text-dim)":(rpVal>=0?"var(--emerald)":"var(--red)")) + "'>" + rp + "</td></tr>";
+        "<td>" + fmtMoney(a.saldoInicial) + "</td>" +
+        "<td>" + (a.depositos!=null?fmtMoney(a.depositos):"—") + "</td>" +
+        "<td style='font-weight:600;'>" + fmtMoney(a.totalInvertido) + "</td>" +
+        "<td style='color:" + pctColor(a.cambioMercado) + "'>" + signMoney(a.cambioMercado) + "</td>" +
+        "<td style='font-weight:700;'>" + fmtMoney(a.gpInstrumento) + "</td>" +
+        "<td style='font-weight:700;color:" + pctColor(a.rendPortafolio) + "'>" + fmtPct1(a.rendPortafolio) + "</td>" +
+        "<td style='color:var(--emerald)'>" + fmtMoney(a.dividendos) + "</td>" +
+        "<td style='color:var(--red)'>" + fmtMoney(a.cargos) + "</td>" +
+        "<td style='font-weight:600;color:" + pctColor(a.ingresoNetoAnual) + "'>" + signMoney(a.ingresoNetoAnual) + "</td>" +
+        "<td style='font-weight:700;color:" + pctColor(a.rendIngresos) + "'>" + fmtPct1(a.rendIngresos) + "</td></tr>";
     }).join("");
     els.swpConsAnualTable.innerHTML = head + rows;
 
@@ -3003,23 +3063,26 @@
       btn.addEventListener("click", function(){ swpConsYear = btn.getAttribute("data-year"); renderPershingConsolidado(); });
     });
 
-    buildSwpConsMesesTable(yearsMap[swpConsYear].meses || {});
+    var ledger = buildSwpMonthlyLedger(yearsMap, years);
+    buildSwpConsMesesTable(ledger[swpConsYear] || {});
   }
 
   function buildSwpConsMesesTable(meses){
-    var head = "<tr><th style='text-align:left'>Mes</th><th>Saldo</th><th>Depósitos</th><th>Dividendos</th><th>Cargos</th><th>Cambio Mercado</th><th>Ganancia/Pérdida</th><th>Rendimiento</th></tr>";
+    var head = "<tr><th style='text-align:left'>Mes</th><th>Saldo Anterior</th><th>Depósitos</th><th>Total Inversión</th><th>Cambio Mercado</th><th>G/P Portafolio</th><th>Rendimiento</th><th>Dividendos</th><th>Cargos</th><th>Ingresos Netos Mensual</th><th>Rendimiento</th></tr>";
     var rows = SWP_CONS_MESES.map(function(m){
       var e = meses[m];
-      if(!e) return "<tr><td style='text-align:left;color:var(--text-dim)'>" + m + "</td><td colspan='7' style='color:var(--text-dim)'>—</td></tr>";
-      var rp = e.rendimientoPct != null ? (e.rendimientoPct*100).toFixed(1)+"%" : "—";
+      if(!e) return "<tr><td style='text-align:left;color:var(--text-dim)'>" + m + "</td><td colspan='10' style='color:var(--text-dim)'>—</td></tr>";
       return "<tr><td style='text-align:left;font-weight:700;color:var(--text)'>" + m + "</td>" +
-        "<td>" + (e.saldo!=null?fmtMoney(e.saldo):"—") + "</td>" +
-        "<td>" + (e.depositos?fmtMoney(e.depositos):"—") + "</td>" +
+        "<td>" + fmtMoney(e.saldoAnterior) + "</td>" +
+        "<td>" + (e.depositos!=null?fmtMoney(e.depositos):"—") + "</td>" +
+        "<td style='font-weight:600;'>" + fmtMoney(e.totalInversion) + "</td>" +
+        "<td style='color:" + pctColor(e.cambioMercado) + "'>" + signMoney(e.cambioMercado) + "</td>" +
+        "<td style='font-weight:700;'>" + fmtMoney(e.gpPortafolio) + "</td>" +
+        "<td style='font-weight:600;color:" + pctColor(e.rendPortafolio) + "'>" + fmtPct1(e.rendPortafolio) + "</td>" +
         "<td style='color:var(--emerald)'>" + (e.dividendos?fmtMoney(e.dividendos):"—") + "</td>" +
         "<td style='color:var(--red)'>" + (e.cargos?fmtMoney(e.cargos):"—") + "</td>" +
-        "<td style='color:" + ((e.cambioNeto||0)>=0?"var(--emerald)":"var(--red)") + "'>" + (e.cambioNeto!=null?((e.cambioNeto>=0?"+":"")+fmtMoney(e.cambioNeto)):"—") + "</td>" +
-        "<td style='font-weight:600;color:" + ((e.gananciaPerdida||0)>=0?"var(--emerald)":"var(--red)") + "'>" + (e.gananciaPerdida!=null?((e.gananciaPerdida>=0?"+":"")+fmtMoney(e.gananciaPerdida)):"—") + "</td>" +
-        "<td style='color:" + ((e.rendimientoPct||0)>=0?"var(--emerald)":"var(--red)") + "'>" + rp + "</td></tr>";
+        "<td style='font-weight:600;color:" + pctColor(e.ingresosNetosMensual) + "'>" + signMoney(e.ingresosNetosMensual) + "</td>" +
+        "<td style='color:" + pctColor(e.rendIngresos) + "'>" + fmtPct1(e.rendIngresos) + "</td></tr>";
     }).join("");
     els.swpConsMesesTable.innerHTML = head + rows;
   }
