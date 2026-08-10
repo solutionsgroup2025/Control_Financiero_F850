@@ -3054,10 +3054,13 @@
     var prevD = prevPer ? hist[prevPer] : null;
     var chg = d.cambioNeto || 0;
 
+    var otrasTrans = d.otrasTransacciones || 0;
+    var ingNetos = d.ingresosNetos != null ? d.ingresosNetos : (d.ing||0) - (d.car||0) - otrasTrans;
     els.swpKpis.innerHTML =
       '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">VALOR TOTAL</div><div class="value">' + fmtMoney(d.total) + '</div><div class="foot">' + escapeHtml(per) + '</div></div>' +
-      '<div class="summary-card" style="--accent:var(--blue)"><div class="label">INGRESOS BRUTOS</div><div class="value">' + fmtMoney(d.ing) + '</div><div class="foot">Cargos: ' + fmtMoney(d.car) + '</div></div>' +
-      '<div class="summary-card" style="--accent:' + (chg>=0?'var(--emerald)':'var(--red)') + '"><div class="label">CAMBIO NETO</div><div class="value" style="color:' + (chg>=0?'var(--emerald)':'var(--red)') + '">' + (chg>=0?'+':'') + fmtMoney(chg) + '</div><div class="foot">' + (prevPer ? 'vs ' + escapeHtml(prevPer) : '') + '</div></div>';
+      '<div class="summary-card" style="--accent:var(--blue)"><div class="label">INGRESOS BRUTOS</div><div class="value">' + fmtMoney(d.ing) + '</div><div class="foot">Cargos: ' + fmtMoney(d.car) + (otrasTrans ? ' · Otras trans.: ' + fmtMoney(otrasTrans) : '') + '</div></div>' +
+      '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">INGRESOS NETOS</div><div class="value" style="color:var(--emerald)">' + fmtMoney(ingNetos) + '</div><div class="foot">Lo que realmente entra al bolsillo, después de cargos y otras transacciones</div></div>' +
+      '<div class="summary-card" style="--accent:' + (chg>=0?'var(--emerald)':'var(--red)') + '"><div class="label">CAMBIO NETO (MERCADO)</div><div class="value" style="color:' + (chg>=0?'var(--emerald)':'var(--red)') + '">' + (chg>=0?'+':'') + fmtMoney(chg) + '</div><div class="foot">' + (prevPer ? 'vs ' + escapeHtml(prevPer) : '') + ' — variación de precio, sin efectivo</div></div>';
 
     var comp = d.composicion || {};
     els.swpComposicion.innerHTML = SWP_ORDER.map(function(k){
@@ -3078,10 +3081,16 @@
     }
     compHtml += '<div class="sr"><span class="lbl">Ingresos brutos del periodo</span><span class="val" style="color:var(--emerald)">' + fmtMoney(d.ing) + '</span></div>' +
       '<div class="sr"><span class="lbl">Cargos del periodo</span><span class="val" style="color:var(--red)">' + fmtMoney(d.car) + '</span></div>';
+    if(otrasTrans){
+      compHtml += '<div class="sr"><span class="lbl">Otras transacciones del periodo</span><span class="val" style="color:var(--red)">' + fmtMoney(otrasTrans) + '</span></div>';
+    }
+    compHtml += '<div class="sr" style="font-weight:700;"><span class="lbl">Ingresos netos del periodo</span><span class="val" style="color:var(--emerald)">' + fmtMoney(ingNetos) + '</span></div>';
     var valorInicial = d.inicial != null ? d.inicial : (prevD ? prevD.total : 0);
     var resumenLine = 'Resumen: ' + fmtMoney(valorInicial) + ' inicial';
     if(d.depositos) resumenLine += ' + ' + fmtMoney(d.depositos) + ' depósitos';
-    resumenLine += ' + ' + fmtMoney(d.ing) + ' ingresos − ' + fmtMoney(d.car) + ' cargos ' + (chg>=0?'+':'−') + ' ' + fmtMoney(Math.abs(chg)) + ' cambio mercado = ' + fmtMoney(d.total) + ' final';
+    resumenLine += ' + ' + fmtMoney(d.ing) + ' ingresos − ' + fmtMoney(d.car) + ' cargos';
+    if(otrasTrans) resumenLine += ' − ' + fmtMoney(otrasTrans) + ' otras transacciones';
+    resumenLine += ' ' + (chg>=0?'+':'−') + ' ' + fmtMoney(Math.abs(chg)) + ' cambio mercado = ' + fmtMoney(d.total) + ' final';
     compHtml += '<div class="sr" style="border-top:1px solid var(--border);margin-top:6px;padding-top:12px;font-size:11.5px;color:var(--text-dim);"><span>' + resumenLine + '</span></div>';
 
     var detLines = [];
@@ -3098,6 +3107,9 @@
       d.cargosLineas.forEach(function(l){ if(l.monto) detLines.push('<div class="sr"><span class="lbl" style="padding-left:10px;">↳ ' + escapeHtml(l.descripcion||"Cargo") + '</span><span class="val" style="color:var(--red);font-size:12px;">−' + fmtMoney(Math.abs(l.monto)) + '</span></div>'); });
     } else if(d.cargosDetalle){
       Object.keys(SWP_CARGO_LABELS_LEGACY).forEach(function(k){ if(d.cargosDetalle[k]) detLines.push('<div class="sr"><span class="lbl" style="padding-left:10px;">↳ ' + SWP_CARGO_LABELS_LEGACY[k] + '</span><span class="val" style="color:var(--red);font-size:12px;">−' + fmtMoney(d.cargosDetalle[k]) + '</span></div>'); });
+    }
+    if(d.otrasTransaccionesLineas && d.otrasTransaccionesLineas.length){
+      d.otrasTransaccionesLineas.forEach(function(l){ if(l.monto) detLines.push('<div class="sr"><span class="lbl" style="padding-left:10px;">↳ ' + escapeHtml(l.descripcion||"Otra transacción") + '</span><span class="val" style="color:var(--red);font-size:12px;">−' + fmtMoney(Math.abs(l.monto)) + '</span></div>'); });
     }
     if(d.interesDevengadoRentaFija){
       detLines.push('<div class="sr"><span class="lbl" style="padding-left:10px;">↳ Interés devengado en bonos (no es efectivo)</span><span class="val" style="color:var(--amber);font-size:12px;">' + fmtMoney(d.interesDevengadoRentaFija) + '</span></div>');
@@ -3195,12 +3207,26 @@
     var totDist = filtered.reduce(function(s,h){ return s+(h.distribucion||0); },0);
     els.swpBrYearTotal.innerHTML = "Total distribuciones recibidas en <strong style='color:var(--emerald)'>" + swpBrYear + "</strong>: <strong style='color:var(--emerald)'>" + fmtMoney(totDist) + "</strong> (" + filtered.length + " meses registrados)";
 
-    var brHead = "<tr><th style='text-align:left'>Período</th><th>Valor</th><th>Distribución</th><th>G/P No Real.</th></tr>";
+    // orden cronológico completo (no solo el año filtrado) para poder comparar cada mes contra el inmediatamente anterior
+    var todosOrdenados = historial.slice().sort(function(a,b){ return a.per<b.per?-1:1; });
+    var brHead = "<tr><th style='text-align:left'>Período</th><th>Valor Inicial (Costo)</th><th>G/P No Realizada</th><th>Valor Actual</th><th>Distribución Mensual</th></tr>";
     var brRows = filtered.map(function(h){
-      return "<tr><td>" + monthLabel(h.per) + "</td><td>" + fmtMoney(h.valor) + "</td><td style='color:var(--emerald)'>" + fmtMoney(h.distribucion) + "</td><td style='color:var(--red)'>" + fmtMoney(h.gpNoReal) + "</td></tr>";
+      var valorInicial = (h.valor!=null && h.gpNoReal!=null) ? (h.valor - h.gpNoReal) : null;
+      var idxGlobal = todosOrdenados.findIndex(function(x){ return x.per === h.per; });
+      var anterior = idxGlobal > 0 ? todosOrdenados[idxGlobal-1] : null;
+      var flecha = "";
+      if(anterior && anterior.valor != null && h.valor != null){
+        if(h.valor > anterior.valor) flecha = " <span style='color:var(--emerald)'>▲</span>";
+        else if(h.valor < anterior.valor) flecha = " <span style='color:var(--red)'>▼</span>";
+      }
+      return "<tr><td>" + monthLabel(h.per) + "</td>" +
+        "<td style='color:var(--text-dim)'>" + (valorInicial!=null?fmtMoney(valorInicial):"—") + "</td>" +
+        "<td style='color:" + ((h.gpNoReal||0)>=0?"var(--emerald)":"var(--red)") + "'>" + ((h.gpNoReal||0)>=0?"+":"−") + fmtMoney(Math.abs(h.gpNoReal||0)) + "</td>" +
+        "<td style='font-weight:700;'>" + fmtMoney(h.valor) + flecha + "</td>" +
+        "<td style='color:var(--emerald)'>" + fmtMoney(h.distribucion) + "</td></tr>";
     }).join("");
-    var totRow = "<tr class='matrix-total'><td>TOTAL " + escapeHtml(swpBrYear) + "</td><td></td><td style='color:var(--emerald)'>" + fmtMoney(totDist) + "</td><td></td></tr>";
-    els.swpBlackrockTable.innerHTML = brHead + (brRows || "<tr><td colspan='4' style='text-align:center;color:var(--text-dim);padding:18px;'>Sin registros para " + escapeHtml(swpBrYear) + ".</td></tr>") + totRow;
+    var totRow = "<tr class='matrix-total'><td>TOTAL " + escapeHtml(swpBrYear) + "</td><td></td><td></td><td></td><td style='color:var(--emerald)'>" + fmtMoney(totDist) + "</td></tr>";
+    els.swpBlackrockTable.innerHTML = brHead + (brRows || "<tr><td colspan='5' style='text-align:center;color:var(--text-dim);padding:18px;'>Sin registros para " + escapeHtml(swpBrYear) + ".</td></tr>") + totRow;
   }
 
   /* ---------- RL360 (pólizas y fondos) ---------- */
@@ -3637,10 +3663,12 @@
       }
     }
 
-    var hasCashDetail = (obj.ingresosLineas && obj.ingresosLineas.length) || (obj.cargosLineas && obj.cargosLineas.length) || obj.distribucionBlackRock != null;
+    var hasCashDetail = (obj.ingresosLineas && obj.ingresosLineas.length) || (obj.cargosLineas && obj.cargosLineas.length) || (obj.otrasTransaccionesLineas && obj.otrasTransaccionesLineas.length) || obj.distribucionBlackRock != null || obj.otrasTransacciones != null;
     pendingPershingCashDetail = hasCashDetail ? {
       ingresosLineas: obj.ingresosLineas || [],
       cargosLineas: obj.cargosLineas || [],
+      otrasTransaccionesLineas: obj.otrasTransaccionesLineas || [],
+      otrasTransacciones: obj.otrasTransacciones,
       distribucionBlackRock: obj.distribucionBlackRock,
       interesDevengadoRentaFija: obj.interesDevengadoRentaFija
     } : null;
@@ -3652,6 +3680,7 @@
         }
         pendingPershingCashDetail.ingresosLineas.forEach(function(l){ if(l.monto) lines.push("<span style='color:var(--emerald)'>+" + fmtMoney(l.monto) + "</span> " + escapeHtml(l.descripcion||"Ingreso")); });
         pendingPershingCashDetail.cargosLineas.forEach(function(l){ if(l.monto) lines.push("<span style='color:var(--red)'>−" + fmtMoney(Math.abs(l.monto)) + "</span> " + escapeHtml(l.descripcion||"Cargo")); });
+        pendingPershingCashDetail.otrasTransaccionesLineas.forEach(function(l){ if(l.monto) lines.push("<span style='color:var(--red)'>−" + fmtMoney(Math.abs(l.monto)) + "</span> " + escapeHtml(l.descripcion||"Otra transacción") + " <span style='color:var(--text-dim);font-size:10px;'>(otras transacciones)</span>"); });
         if(pendingPershingCashDetail.interesDevengadoRentaFija) lines.push("<span style='color:var(--amber)'>" + fmtMoney(pendingPershingCashDetail.interesDevengadoRentaFija) + "</span> interés devengado en bonos (no es efectivo recibido — solo informativo)");
         els.ivPershingCashDetail.innerHTML = lines.length
           ? "<div style='color:var(--text-dim);font-size:11.5px;margin-bottom:4px;'>Desglose detectado (revisa contra el PDF antes de aplicar):</div><div style='font-size:12.5px;line-height:1.9;'>" + lines.join("<br>") + "</div>"
@@ -3768,19 +3797,21 @@
             "2. total: valor total de la cuenta al final del periodo\n" +
             "3. distribucionBlackRock: EL DATO MÁS IMPORTANTE — busca en \"Transacciones por Tipo de Actividad\" → \"Distribuciones\" la fila \"Total de Distribuciones\" y toma el SEGUNDO número de esa fila (la columna \"Monto\", justo antes de \"USD\" — NO el primer número, que es la columna \"Intereses Devengados\" y siempre es $0.00 aquí). Debe coincidir con el monto de la transacción individual \"PARTNERSHIP DISTRIBUTION\" relacionada a BLACKROCK que aparece arriba de esa fila de total. Si de verdad no hay ninguna transacción de distribución este mes (no aparece \"PARTNERSHIP DISTRIBUTION\" ni sección \"Distribuciones\" en el documento), usa 0 — pero BUSCA A FONDO antes de poner 0, este dato casi siempre existe.\n" +
             "4. ingresos: el monto de \"Total de ingresos\" (columna Período Actual) en \"Resumen de Ingresos y Gastos\" — dividendos + intereses de bonos, SIN incluir distribucionBlackRock (son secciones separadas en el documento)\n" +
-            "5. cargos: total de cargos/comisiones/tarifas del periodo (positivo, ej. si el documento dice \"-$64.50\" reporta 64.50)\n" +
+            "5. cargos: SOLO la sección \"Cargos\" de \"Transacciones por Tipo de Actividad\" (ej. Foreign Custody Fee, Administration Fee) — total de esa fila \"Total de Cargos\" (positivo, ej. si el documento dice \"-$64.50\" reporta 64.50). NO mezcles aquí la sección \"Otras Transacciones\", que va en el campo 12 aparte — son DOS secciones distintas del documento y confundirlas descuadra el cambio neto del portafolio.\n" +
             "6. depositos: depósitos o aportes NUEVOS de efectivo hechos a la cuenta en el periodo (transferencias/ACH/wire entrantes; si no hay, usa 0)\n" +
             "7. composicion (opcional, si el documento lo muestra por clase de activo): {\"efectivo\":0,\"bonos\":0,\"fondos\":0,\"etf\":0,\"alternativos\":0}\n" +
             "8. ingresosLineas: arreglo con CADA línea de \"Resumen de Ingresos y Gastos\" tal como aparece (columna Período Actual), ej: [{\"descripcion\":\"Fondos Money Market\",\"monto\":0},{\"descripcion\":\"Intereses de Bonos\",\"monto\":0}] — no incluyas aquí la distribución de BlackRock, esa va en el campo \"distribucionBlackRock\"\n" +
-            "9. cargosLineas: arreglo con CADA cargo/comisión individual tal como aparece en \"Transacciones por Tipo de Actividad\" → \"Cargos\", con su descripción literal, ej: [{\"descripcion\":\"Foreign Custody Fee\",\"monto\":2.00},{\"descripcion\":\"Administration Fee\",\"monto\":62.50}]\n" +
+            "9. cargosLineas: arreglo con CADA cargo/comisión individual de la sección \"Cargos\" en \"Transacciones por Tipo de Actividad\", con su descripción literal, ej: [{\"descripcion\":\"Foreign Custody Fee\",\"monto\":2.00},{\"descripcion\":\"Administration Fee\",\"monto\":62.50}]\n" +
             "10. interesDevengadoRentaFija: interés ACUMULADO/DEVENGADO (columna \"Intereses Devengados\" en la tabla de transacciones, no pagado en efectivo todavía) de los bonos, si aparece como cifra separada (informativo, NO se suma a \"ingresos\")\n" +
             "11. posiciones: el detalle línea por línea de CADA posición individual que encuentres en las tablas de holdings/posiciones (NO en las transacciones):\n" +
             "   - fondosMutuos: [{\"fondo\":\"nombre\",\"cantidad\":0,\"costoUnit\":0,\"baseCosto\":0,\"precioMkt\":0,\"valorMkt\":0,\"gpNoReal\":0}]\n" +
             "   - bonosCorp: [{\"instrumento\":\"nombre\",\"cantidad\":0,\"costoUnit\":0,\"baseCosto\":0,\"precioMkt\":0,\"valorMkt\":0,\"gpNoReal\":0,\"interesDevengado\":0,\"vencimiento\":\"YYYY-MM-DD\",\"cusip\":\"...\"}]\n" +
             "   - etfs: [{\"etf\":\"nombre\",\"acciones\":0,\"costoUnit\":0,\"baseCosto\":0,\"precioMkt\":0,\"valorMkt\":0,\"gpNoReal\":0,\"identificador\":\"...\"}]\n" +
             "   - blackrock: {\"valorActual\":0,\"precioAccion\":0,\"acciones\":0,\"gpNoReal\":0} (valor/precio/acciones de la POSICIÓN de BlackRock en la tabla de holdings — NO pongas aquí la distribución, esa va en el campo \"distribucionBlackRock\" del nivel superior)\n" +
-            "IMPORTANTE: si alguna sección no aparece en el documento, omítela o déjala como arreglo/objeto vacío — NO inventes posiciones, cargos ni cifras que no estén literalmente en el texto. Responde SOLO con el JSON, sin texto adicional."
-          + "\n\nEjemplo del formato de respuesta esperado (con datos de ejemplo, no los copies):\n{\"periodo\":\"2026-05\",\"total\":222218.47,\"distribucionBlackRock\":665.36,\"ingresos\":704.13,\"cargos\":64.50,\"depositos\":0,\"composicion\":{},\"ingresosLineas\":[{\"descripcion\":\"Fondos Money Market\",\"monto\":20.38},{\"descripcion\":\"Intereses de Bonos\",\"monto\":683.75}],\"cargosLineas\":[{\"descripcion\":\"Foreign Custody Fee\",\"monto\":2.00},{\"descripcion\":\"Administration Fee\",\"monto\":62.50}],\"posiciones\":{}}"
+            "12. otrasTransacciones: EL DATO QUE MÁS SE OMITE — busca en \"Transacciones por Tipo de Actividad\" la sección \"Otras Transacciones\" (distinta de \"Cargos\"; suele incluir cosas como \"PORTFOLIO PERFORMANCE - ONLINE PLUS\", \"PES BILLING FEE\", etc.) y toma el segundo número (columna Monto) de su fila \"Total de Otras Transacciones\". Si no aparece esa sección en el documento, usa 0.\n" +
+            "13. otrasTransaccionesLineas: arreglo con CADA línea individual de la sección \"Otras Transacciones\", ej: [{\"descripcion\":\"Portfolio Performance - Online Plus\",\"monto\":12.00}]\n" +
+            "IMPORTANTE: \"Cargos\" y \"Otras Transacciones\" son DOS secciones separadas del documento con su propio \"Total de [sección]\" — no las combines en un solo número, ni te saltes \"Otras Transacciones\" aunque el monto parezca pequeño: si falta, el cambio neto del portafolio queda descuadrado. Si alguna sección no aparece en el documento, omítela o déjala como arreglo/objeto vacío — NO inventes posiciones, cargos ni cifras que no estén literalmente en el texto. Responde SOLO con el JSON, sin texto adicional."
+          + "\n\nEjemplo del formato de respuesta esperado (con datos de ejemplo, no los copies):\n{\"periodo\":\"2026-05\",\"total\":222218.47,\"distribucionBlackRock\":665.36,\"ingresos\":704.13,\"cargos\":64.50,\"depositos\":0,\"composicion\":{},\"ingresosLineas\":[{\"descripcion\":\"Fondos Money Market\",\"monto\":20.38},{\"descripcion\":\"Intereses de Bonos\",\"monto\":683.75}],\"cargosLineas\":[{\"descripcion\":\"Foreign Custody Fee\",\"monto\":2.00},{\"descripcion\":\"Administration Fee\",\"monto\":62.50}],\"otrasTransacciones\":12.00,\"otrasTransaccionesLineas\":[{\"descripcion\":\"Portfolio Performance - Online Plus\",\"monto\":12.00}],\"posiciones\":{}}"
           : isSwLocal
           ? "Este es el texto extraído de un estado de cuenta de SweetWater Securities (bonos locales panameños, renta fija + acciones preferidas):\n\n" + pdfPreviewText +
             "\n\nEl documento tiene estas secciones — úsalas como guía:\n" +
@@ -3977,8 +4008,13 @@
       var saldoAnteriorInput = els.ivSaldoAnterior.value === "" ? null : parseFloat(els.ivSaldoAnterior.value);
       var inicialVal = saldoAnteriorInput != null ? saldoAnteriorInput : (prev ? prev.total : (ph[per]?ph[per].inicial:0));
       var depositosIn = els.ivPershingDepositos.value === "" ? 0 : (parseFloat(els.ivPershingDepositos.value) || 0);
-      // cambioNeto = variación de mercado pura, aislada del efecto de depósitos/ingresos/cargos (mismo criterio que los datos reales de Familia777)
-      var cambioNeto = (valorTotal!=null) ? ((valorTotal - inicialVal) - depositosIn - ingresos + cargos) : (ph[per]?ph[per].cambioNeto:0);
+      // "Otras Transacciones" es una sección separada de "Cargos" en el estado de cuenta (ej. Portfolio Performance
+      // Online Plus, PES Billing Fee) — si no se resta aquí, ese dinero queda mezclado con la variación de mercado
+      var otrasTransaccionesDelMes = (pendingPershingCashDetail && pendingPershingCashDetail.otrasTransacciones != null) ? pendingPershingCashDetail.otrasTransacciones : (ph[per] ? (ph[per].otrasTransacciones||0) : 0);
+      // cambioNeto = variación de mercado pura, aislada del efecto de depósitos/ingresos/cargos/otras transacciones
+      var cambioNeto = (valorTotal!=null) ? ((valorTotal - inicialVal) - depositosIn - ingresos + cargos + otrasTransaccionesDelMes) : (ph[per]?ph[per].cambioNeto:0);
+      // ingresosNetos = lo que realmente entra al bolsillo ese mes, después de cargos y otras transacciones
+      var ingresosNetos = ingresos - cargos - otrasTransaccionesDelMes;
       var prevComp = (ph[per] && ph[per].composicion) || (prev && prev.composicion) || {};
       var efectivoIn = els.ivEfectivo.value === "" ? null : parseFloat(els.ivEfectivo.value);
       var rentaFijaIn = els.ivRentaFija.value === "" ? null : parseFloat(els.ivRentaFija.value);
@@ -3996,6 +4032,7 @@
         total: valorTotal!=null?valorTotal:(ph[per]?ph[per].total:0),
         inicial: inicialVal,
         ing: ingresos, car: cargos, cambioNeto: cambioNeto,
+        otrasTransacciones: otrasTransaccionesDelMes, ingresosNetos: ingresosNetos,
         depositos: depositosIn,
         composicion: newComp
       };
@@ -4006,6 +4043,7 @@
       if(pendingPershingCashDetail){
         if((pendingPershingCashDetail.ingresosLineas||[]).length) ph[per].ingresosLineas = pendingPershingCashDetail.ingresosLineas;
         if((pendingPershingCashDetail.cargosLineas||[]).length) ph[per].cargosLineas = pendingPershingCashDetail.cargosLineas;
+        if((pendingPershingCashDetail.otrasTransaccionesLineas||[]).length) ph[per].otrasTransaccionesLineas = pendingPershingCashDetail.otrasTransaccionesLineas;
         if(distribucionBlackRockDelMes != null) ph[per].distribucionBlackRock = distribucionBlackRockDelMes;
         if(pendingPershingCashDetail.interesDevengadoRentaFija != null) ph[per].interesDevengadoRentaFija = pendingPershingCashDetail.interesDevengadoRentaFija;
         pendingPershingCashDetail = null;
