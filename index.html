@@ -3055,10 +3055,11 @@
     var chg = d.cambioNeto || 0;
 
     var otrasTrans = d.otrasTransacciones || 0;
-    var ingNetos = d.ingresosNetos != null ? d.ingresosNetos : (d.ing||0) - (d.car||0) - otrasTrans;
+    var impRetenidos = d.impuestosRetenidos || 0;
+    var ingNetos = d.ingresosNetos != null ? d.ingresosNetos : (d.ing||0) - (d.car||0) - otrasTrans - impRetenidos;
     els.swpKpis.innerHTML =
       '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">VALOR TOTAL</div><div class="value">' + fmtMoney(d.total) + '</div><div class="foot">' + escapeHtml(per) + '</div></div>' +
-      '<div class="summary-card" style="--accent:var(--blue)"><div class="label">INGRESOS BRUTOS</div><div class="value">' + fmtMoney(d.ing) + '</div><div class="foot">Cargos: ' + fmtMoney(d.car) + (otrasTrans ? ' · Otras trans.: ' + fmtMoney(otrasTrans) : '') + '</div></div>' +
+      '<div class="summary-card" style="--accent:var(--blue)"><div class="label">INGRESOS BRUTOS</div><div class="value">' + fmtMoney(d.ing) + '</div><div class="foot">Cargos: ' + fmtMoney(d.car) + (otrasTrans ? ' · Otras trans.: ' + fmtMoney(otrasTrans) : '') + (impRetenidos ? ' · Imp. retenidos: ' + fmtMoney(impRetenidos) : '') + '</div></div>' +
       '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">INGRESOS NETOS</div><div class="value" style="color:var(--emerald)">' + fmtMoney(ingNetos) + '</div><div class="foot">Lo que realmente entra al bolsillo, después de cargos y otras transacciones</div></div>' +
       '<div class="summary-card" style="--accent:' + (chg>=0?'var(--emerald)':'var(--red)') + '"><div class="label">CAMBIO NETO (MERCADO)</div><div class="value" style="color:' + (chg>=0?'var(--emerald)':'var(--red)') + '">' + (chg>=0?'+':'') + fmtMoney(chg) + '</div><div class="foot">' + (prevPer ? 'vs ' + escapeHtml(prevPer) : '') + ' — variación de precio, sin efectivo</div></div>';
 
@@ -3084,12 +3085,16 @@
     if(otrasTrans){
       compHtml += '<div class="sr"><span class="lbl">Otras transacciones del periodo</span><span class="val" style="color:var(--red)">' + fmtMoney(otrasTrans) + '</span></div>';
     }
+    if(impRetenidos){
+      compHtml += '<div class="sr"><span class="lbl">Impuestos retenidos del periodo</span><span class="val" style="color:var(--red)">' + fmtMoney(impRetenidos) + '</span></div>';
+    }
     compHtml += '<div class="sr" style="font-weight:700;"><span class="lbl">Ingresos netos del periodo</span><span class="val" style="color:var(--emerald)">' + fmtMoney(ingNetos) + '</span></div>';
     var valorInicial = d.inicial != null ? d.inicial : (prevD ? prevD.total : 0);
     var resumenLine = 'Resumen: ' + fmtMoney(valorInicial) + ' inicial';
     if(d.depositos) resumenLine += ' + ' + fmtMoney(d.depositos) + ' depósitos';
     resumenLine += ' + ' + fmtMoney(d.ing) + ' ingresos − ' + fmtMoney(d.car) + ' cargos';
     if(otrasTrans) resumenLine += ' − ' + fmtMoney(otrasTrans) + ' otras transacciones';
+    if(impRetenidos) resumenLine += ' − ' + fmtMoney(impRetenidos) + ' impuestos retenidos';
     resumenLine += ' ' + (chg>=0?'+':'−') + ' ' + fmtMoney(Math.abs(chg)) + ' cambio mercado = ' + fmtMoney(d.total) + ' final';
     compHtml += '<div class="sr" style="border-top:1px solid var(--border);margin-top:6px;padding-top:12px;font-size:11.5px;color:var(--text-dim);"><span>' + resumenLine + '</span></div>';
 
@@ -3110,6 +3115,9 @@
     }
     if(d.otrasTransaccionesLineas && d.otrasTransaccionesLineas.length){
       d.otrasTransaccionesLineas.forEach(function(l){ if(l.monto) detLines.push('<div class="sr"><span class="lbl" style="padding-left:10px;">↳ ' + escapeHtml(l.descripcion||"Otra transacción") + '</span><span class="val" style="color:var(--red);font-size:12px;">−' + fmtMoney(Math.abs(l.monto)) + '</span></div>'); });
+    }
+    if(d.impuestosRetenidosLineas && d.impuestosRetenidosLineas.length){
+      d.impuestosRetenidosLineas.forEach(function(l){ if(l.monto) detLines.push('<div class="sr"><span class="lbl" style="padding-left:10px;">↳ ' + escapeHtml(l.descripcion||"Impuesto retenido") + '</span><span class="val" style="color:var(--red);font-size:12px;">−' + fmtMoney(Math.abs(l.monto)) + '</span></div>'); });
     }
     if(d.interesDevengadoRentaFija){
       detLines.push('<div class="sr"><span class="lbl" style="padding-left:10px;">↳ Interés devengado en bonos (no es efectivo)</span><span class="val" style="color:var(--amber);font-size:12px;">' + fmtMoney(d.interesDevengadoRentaFija) + '</span></div>');
@@ -3663,12 +3671,14 @@
       }
     }
 
-    var hasCashDetail = (obj.ingresosLineas && obj.ingresosLineas.length) || (obj.cargosLineas && obj.cargosLineas.length) || (obj.otrasTransaccionesLineas && obj.otrasTransaccionesLineas.length) || obj.distribucionBlackRock != null || obj.otrasTransacciones != null;
+    var hasCashDetail = (obj.ingresosLineas && obj.ingresosLineas.length) || (obj.cargosLineas && obj.cargosLineas.length) || (obj.otrasTransaccionesLineas && obj.otrasTransaccionesLineas.length) || (obj.impuestosRetenidosLineas && obj.impuestosRetenidosLineas.length) || obj.distribucionBlackRock != null || obj.otrasTransacciones != null || obj.impuestosRetenidos != null;
     pendingPershingCashDetail = hasCashDetail ? {
       ingresosLineas: obj.ingresosLineas || [],
       cargosLineas: obj.cargosLineas || [],
       otrasTransaccionesLineas: obj.otrasTransaccionesLineas || [],
       otrasTransacciones: obj.otrasTransacciones,
+      impuestosRetenidosLineas: obj.impuestosRetenidosLineas || [],
+      impuestosRetenidos: obj.impuestosRetenidos,
       distribucionBlackRock: obj.distribucionBlackRock,
       interesDevengadoRentaFija: obj.interesDevengadoRentaFija
     } : null;
@@ -3681,6 +3691,7 @@
         pendingPershingCashDetail.ingresosLineas.forEach(function(l){ if(l.monto) lines.push("<span style='color:var(--emerald)'>+" + fmtMoney(l.monto) + "</span> " + escapeHtml(l.descripcion||"Ingreso")); });
         pendingPershingCashDetail.cargosLineas.forEach(function(l){ if(l.monto) lines.push("<span style='color:var(--red)'>−" + fmtMoney(Math.abs(l.monto)) + "</span> " + escapeHtml(l.descripcion||"Cargo")); });
         pendingPershingCashDetail.otrasTransaccionesLineas.forEach(function(l){ if(l.monto) lines.push("<span style='color:var(--red)'>−" + fmtMoney(Math.abs(l.monto)) + "</span> " + escapeHtml(l.descripcion||"Otra transacción") + " <span style='color:var(--text-dim);font-size:10px;'>(otras transacciones)</span>"); });
+        pendingPershingCashDetail.impuestosRetenidosLineas.forEach(function(l){ if(l.monto) lines.push("<span style='color:var(--red)'>−" + fmtMoney(Math.abs(l.monto)) + "</span> " + escapeHtml(l.descripcion||"Impuesto retenido") + " <span style='color:var(--text-dim);font-size:10px;'>(impuestos retenidos)</span>"); });
         if(pendingPershingCashDetail.interesDevengadoRentaFija) lines.push("<span style='color:var(--amber)'>" + fmtMoney(pendingPershingCashDetail.interesDevengadoRentaFija) + "</span> interés devengado en bonos (no es efectivo recibido — solo informativo)");
         els.ivPershingCashDetail.innerHTML = lines.length
           ? "<div style='color:var(--text-dim);font-size:11.5px;margin-bottom:4px;'>Desglose detectado (revisa contra el PDF antes de aplicar):</div><div style='font-size:12.5px;line-height:1.9;'>" + lines.join("<br>") + "</div>"
@@ -3810,8 +3821,10 @@
             "   - blackrock: {\"valorActual\":0,\"precioAccion\":0,\"acciones\":0,\"gpNoReal\":0} (valor/precio/acciones de la POSICIÓN de BlackRock en la tabla de holdings — NO pongas aquí la distribución, esa va en el campo \"distribucionBlackRock\" del nivel superior)\n" +
             "12. otrasTransacciones: EL DATO QUE MÁS SE OMITE — busca en \"Transacciones por Tipo de Actividad\" la sección \"Otras Transacciones\" (distinta de \"Cargos\"; suele incluir cosas como \"PORTFOLIO PERFORMANCE - ONLINE PLUS\", \"PES BILLING FEE\", etc.) y toma el segundo número (columna Monto) de su fila \"Total de Otras Transacciones\". Si no aparece esa sección en el documento, usa 0.\n" +
             "13. otrasTransaccionesLineas: arreglo con CADA línea individual de la sección \"Otras Transacciones\", ej: [{\"descripcion\":\"Portfolio Performance - Online Plus\",\"monto\":12.00}]\n" +
-            "IMPORTANTE: \"Cargos\" y \"Otras Transacciones\" son DOS secciones separadas del documento con su propio \"Total de [sección]\" — no las combines en un solo número, ni te saltes \"Otras Transacciones\" aunque el monto parezca pequeño: si falta, el cambio neto del portafolio queda descuadrado. Si alguna sección no aparece en el documento, omítela o déjala como arreglo/objeto vacío — NO inventes posiciones, cargos ni cifras que no estén literalmente en el texto. Responde SOLO con el JSON, sin texto adicional."
-          + "\n\nEjemplo del formato de respuesta esperado (con datos de ejemplo, no los copies):\n{\"periodo\":\"2026-05\",\"total\":222218.47,\"distribucionBlackRock\":665.36,\"ingresos\":704.13,\"cargos\":64.50,\"depositos\":0,\"composicion\":{},\"ingresosLineas\":[{\"descripcion\":\"Fondos Money Market\",\"monto\":20.38},{\"descripcion\":\"Intereses de Bonos\",\"monto\":683.75}],\"cargosLineas\":[{\"descripcion\":\"Foreign Custody Fee\",\"monto\":2.00},{\"descripcion\":\"Administration Fee\",\"monto\":62.50}],\"otrasTransacciones\":12.00,\"otrasTransaccionesLineas\":[{\"descripcion\":\"Portfolio Performance - Online Plus\",\"monto\":12.00}],\"posiciones\":{}}"
+            "14. impuestosRetenidos: busca en \"Transacciones por Tipo de Actividad\" la sección \"Impuestos Retenidos\" (ej. \"NON-RESIDENT ALIEN TAX\") y toma el segundo número (columna Monto) de su fila \"Total de Impuestos Retenidos\". Es una sección SEPARADA de \"Cargos\" y de \"Otras Transacciones\" — las tres existen independientemente en el documento. Si no aparece, usa 0.\n" +
+            "15. impuestosRetenidosLineas: arreglo con CADA línea individual de \"Impuestos Retenidos\", ej: [{\"descripcion\":\"Non-Resident Alien Tax\",\"monto\":7.76}]\n" +
+            "IMPORTANTE: \"Cargos\", \"Otras Transacciones\" e \"Impuestos Retenidos\" son TRES secciones separadas del documento, cada una con su propio \"Total de [sección]\" — no las combines entre sí, ni te saltes ninguna aunque el monto parezca pequeño: si falta alguna, el cambio neto del portafolio queda descuadrado. Si alguna sección no aparece en el documento, omítela o déjala como arreglo/objeto vacío — NO inventes posiciones, cargos ni cifras que no estén literalmente en el texto. Responde SOLO con el JSON, sin texto adicional."
+          + "\n\nEjemplo del formato de respuesta esperado (con datos de ejemplo, no los copies):\n{\"periodo\":\"2026-05\",\"total\":222218.47,\"distribucionBlackRock\":665.36,\"ingresos\":704.13,\"cargos\":64.50,\"depositos\":0,\"composicion\":{},\"ingresosLineas\":[{\"descripcion\":\"Fondos Money Market\",\"monto\":20.38},{\"descripcion\":\"Intereses de Bonos\",\"monto\":683.75}],\"cargosLineas\":[{\"descripcion\":\"Foreign Custody Fee\",\"monto\":2.00},{\"descripcion\":\"Administration Fee\",\"monto\":62.50}],\"otrasTransacciones\":12.00,\"otrasTransaccionesLineas\":[{\"descripcion\":\"Portfolio Performance - Online Plus\",\"monto\":12.00}],\"impuestosRetenidos\":7.76,\"impuestosRetenidosLineas\":[{\"descripcion\":\"Non-Resident Alien Tax\",\"monto\":7.76}],\"posiciones\":{}}"
           : isSwLocal
           ? "Este es el texto extraído de un estado de cuenta de SweetWater Securities (bonos locales panameños, renta fija + acciones preferidas):\n\n" + pdfPreviewText +
             "\n\nEl documento tiene estas secciones — úsalas como guía:\n" +
@@ -4008,13 +4021,15 @@
       var saldoAnteriorInput = els.ivSaldoAnterior.value === "" ? null : parseFloat(els.ivSaldoAnterior.value);
       var inicialVal = saldoAnteriorInput != null ? saldoAnteriorInput : (prev ? prev.total : (ph[per]?ph[per].inicial:0));
       var depositosIn = els.ivPershingDepositos.value === "" ? 0 : (parseFloat(els.ivPershingDepositos.value) || 0);
-      // "Otras Transacciones" es una sección separada de "Cargos" en el estado de cuenta (ej. Portfolio Performance
-      // Online Plus, PES Billing Fee) — si no se resta aquí, ese dinero queda mezclado con la variación de mercado
+      // "Otras Transacciones" e "Impuestos Retenidos" son secciones separadas de "Cargos" en el estado de cuenta
+      // (ej. Portfolio Performance Online Plus, Non-Resident Alien Tax) — si no se restan aquí, ese dinero queda
+      // mezclado con la variación de mercado
       var otrasTransaccionesDelMes = (pendingPershingCashDetail && pendingPershingCashDetail.otrasTransacciones != null) ? pendingPershingCashDetail.otrasTransacciones : (ph[per] ? (ph[per].otrasTransacciones||0) : 0);
-      // cambioNeto = variación de mercado pura, aislada del efecto de depósitos/ingresos/cargos/otras transacciones
-      var cambioNeto = (valorTotal!=null) ? ((valorTotal - inicialVal) - depositosIn - ingresos + cargos + otrasTransaccionesDelMes) : (ph[per]?ph[per].cambioNeto:0);
-      // ingresosNetos = lo que realmente entra al bolsillo ese mes, después de cargos y otras transacciones
-      var ingresosNetos = ingresos - cargos - otrasTransaccionesDelMes;
+      var impuestosRetenidosDelMes = (pendingPershingCashDetail && pendingPershingCashDetail.impuestosRetenidos != null) ? pendingPershingCashDetail.impuestosRetenidos : (ph[per] ? (ph[per].impuestosRetenidos||0) : 0);
+      // cambioNeto = variación de mercado pura, aislada del efecto de depósitos/ingresos/cargos/otras transacciones/impuestos
+      var cambioNeto = (valorTotal!=null) ? ((valorTotal - inicialVal) - depositosIn - ingresos + cargos + otrasTransaccionesDelMes + impuestosRetenidosDelMes) : (ph[per]?ph[per].cambioNeto:0);
+      // ingresosNetos = lo que realmente entra al bolsillo ese mes, después de cargos, otras transacciones e impuestos
+      var ingresosNetos = ingresos - cargos - otrasTransaccionesDelMes - impuestosRetenidosDelMes;
       var prevComp = (ph[per] && ph[per].composicion) || (prev && prev.composicion) || {};
       var efectivoIn = els.ivEfectivo.value === "" ? null : parseFloat(els.ivEfectivo.value);
       var rentaFijaIn = els.ivRentaFija.value === "" ? null : parseFloat(els.ivRentaFija.value);
@@ -4032,7 +4047,7 @@
         total: valorTotal!=null?valorTotal:(ph[per]?ph[per].total:0),
         inicial: inicialVal,
         ing: ingresos, car: cargos, cambioNeto: cambioNeto,
-        otrasTransacciones: otrasTransaccionesDelMes, ingresosNetos: ingresosNetos,
+        otrasTransacciones: otrasTransaccionesDelMes, impuestosRetenidos: impuestosRetenidosDelMes, ingresosNetos: ingresosNetos,
         depositos: depositosIn,
         composicion: newComp
       };
@@ -4044,6 +4059,7 @@
         if((pendingPershingCashDetail.ingresosLineas||[]).length) ph[per].ingresosLineas = pendingPershingCashDetail.ingresosLineas;
         if((pendingPershingCashDetail.cargosLineas||[]).length) ph[per].cargosLineas = pendingPershingCashDetail.cargosLineas;
         if((pendingPershingCashDetail.otrasTransaccionesLineas||[]).length) ph[per].otrasTransaccionesLineas = pendingPershingCashDetail.otrasTransaccionesLineas;
+        if((pendingPershingCashDetail.impuestosRetenidosLineas||[]).length) ph[per].impuestosRetenidosLineas = pendingPershingCashDetail.impuestosRetenidosLineas;
         if(distribucionBlackRockDelMes != null) ph[per].distribucionBlackRock = distribucionBlackRockDelMes;
         if(pendingPershingCashDetail.interesDevengadoRentaFija != null) ph[per].interesDevengadoRentaFija = pendingPershingCashDetail.interesDevengadoRentaFija;
         pendingPershingCashDetail = null;
