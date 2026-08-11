@@ -674,6 +674,16 @@
       </div>
 
       <div class="page" id="page-cripto">
+        <div class="table-card" style="padding:20px 22px;margin-bottom:16px;">
+          <div class="table-card-head" style="margin-bottom:4px;">
+            <h3>🪙 Binance — Holdings en Vivo</h3>
+            <button class="btn btn-primary" id="btnSyncBinance">↻ Sincronizar con Binance</button>
+          </div>
+          <p class="sub" style="margin:0 0 12px;" id="binanceLiveStatus">Conecta tu API key de Binance en Configuración para ver tus holdings en vivo.</p>
+          <div class="kpi-grid-3" id="binanceLiveKpis" style="margin-bottom:16px;"></div>
+          <div class="matrix-wrap"><table class="matrix" id="binanceLiveTable" style="font-size:12.5px;"></table></div>
+        </div>
+
         <div class="kpi-grid-3" id="cryptoKpis"></div>
         <div class="table-card">
           <div class="table-card-head"><h3>Posiciones Cripto</h3></div>
@@ -699,6 +709,30 @@
             </div>
           </div>
           <div style="margin-top:10px;"><span class="status-pill ok" id="apiKeyStatus" style="display:inline-block;">🔒 Sin API key</span></div>
+        </div>
+
+        <div class="table-card" style="padding:20px 22px;margin-bottom:16px;">
+          <h3 style="margin:0 0 4px;">🪙 API de Binance (solo lectura)</h3>
+          <p class="sub" style="margin:0 0 4px;">Se guarda solo en este navegador (localStorage) — nunca se incluye en el JSON exportado ni sale de tu equipo salvo hacia api.binance.com al sincronizar.</p>
+          <div class="alert-banner warn" style="margin:8px 0 14px;">
+            <div class="at">⚠ Usa SOLO una API key de solo lectura</div>
+            <div class="ax">En Binance → Gestión de API, crea una key con únicamente el permiso "Habilitar Lectura" activado. NO actives "Habilitar Retiros" ni "Habilitar Trading Spot y de Margen". Restringe además el acceso por IP si es posible. Esta key vive únicamente en este navegador; nunca la compartas ni la pegues en otro lugar.</div>
+          </div>
+          <div class="form-grid">
+            <div class="form-field">
+              <label>API Key</label>
+              <input type="password" id="cfgBinanceKey" placeholder="API Key de Binance">
+            </div>
+            <div class="form-field">
+              <label>API Secret</label>
+              <input type="password" id="cfgBinanceSecret" placeholder="API Secret de Binance">
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:10px;">
+            <button class="btn btn-primary" id="btnSaveBinanceKey">Guardar</button>
+            <button class="btn btn-secondary" id="btnClearBinanceKey">Borrar</button>
+          </div>
+          <div style="margin-top:10px;"><span class="status-pill ok" id="binanceKeyStatus" style="display:inline-block;">🔒 Sin API key</span></div>
         </div>
 
         <div class="table-card" style="padding:20px 22px;margin-bottom:16px;">
@@ -1283,10 +1317,19 @@
     inmAlquilerForm: document.getElementById("inmAlquilerForm"),
     cryptoKpis: document.getElementById("cryptoKpis"),
     cryptoTableBody: document.getElementById("cryptoTableBody"),
+    binanceLiveStatus: document.getElementById("binanceLiveStatus"),
+    binanceLiveKpis: document.getElementById("binanceLiveKpis"),
+    binanceLiveTable: document.getElementById("binanceLiveTable"),
+    btnSyncBinance: document.getElementById("btnSyncBinance"),
     cfgApiKey: document.getElementById("cfgApiKey"),
     btnSaveApiKey: document.getElementById("btnSaveApiKey"),
     btnClearApiKey: document.getElementById("btnClearApiKey"),
     apiKeyStatus: document.getElementById("apiKeyStatus"),
+    cfgBinanceKey: document.getElementById("cfgBinanceKey"),
+    cfgBinanceSecret: document.getElementById("cfgBinanceSecret"),
+    btnSaveBinanceKey: document.getElementById("btnSaveBinanceKey"),
+    btnClearBinanceKey: document.getElementById("btnClearBinanceKey"),
+    binanceKeyStatus: document.getElementById("binanceKeyStatus"),
     importFile: document.getElementById("importFile"),
     importStatus: document.getElementById("importStatus"),
     importPreview: document.getElementById("importPreview"),
@@ -3651,6 +3694,7 @@
 
     fetchBinancePrice("BTCUSDT", "cryptoBtcCard");
     fetchBinancePrice("ETHUSDT", "cryptoEthCard");
+    renderBinanceLive();
   }
 
   function fetchBinancePrice(symbol, cardId){
@@ -3677,6 +3721,174 @@
     var has = !!getApiKey();
     els.apiKeyStatus.textContent = has ? "🔓 IA activa" : "🔒 Sin API key";
     els.apiKeyStatus.className = "status-pill " + (has ? "ok" : "dirty");
+  }
+
+  /* ---------- Binance: API de solo lectura (holdings en vivo) ---------- */
+  var BINANCE_KEY_STORAGE = "familia850_binance_key";
+  var BINANCE_SECRET_STORAGE = "familia850_binance_secret";
+  function getBinanceKey(){ return localStorage.getItem(BINANCE_KEY_STORAGE) || ""; }
+  function getBinanceSecret(){ return localStorage.getItem(BINANCE_SECRET_STORAGE) || ""; }
+  function updateBinanceKeyStatus(){
+    var has = !!(getBinanceKey() && getBinanceSecret());
+    if(!els.binanceKeyStatus) return;
+    els.binanceKeyStatus.textContent = has ? "🔓 Conectado" : "🔒 Sin API key";
+    els.binanceKeyStatus.className = "status-pill " + (has ? "ok" : "dirty");
+  }
+
+  function binanceHmacHex(secret, message){
+    var enc = new TextEncoder();
+    return crypto.subtle.importKey("raw", enc.encode(secret), { name:"HMAC", hash:"SHA-256" }, false, ["sign"])
+      .then(function(cryptoKey){ return crypto.subtle.sign("HMAC", cryptoKey, enc.encode(message)); })
+      .then(function(sigBuf){
+        var bytes = new Uint8Array(sigBuf);
+        var hex = "";
+        for(var i=0; i<bytes.length; i++){ hex += bytes[i].toString(16).padStart(2,"0"); }
+        return hex;
+      });
+  }
+
+  function binanceSignedFetch(path, params, method){
+    var apiKey = getBinanceKey(), secret = getBinanceSecret();
+    if(!apiKey || !secret) return Promise.reject(new Error("Falta la API key de Binance en Configuración."));
+    params = params || {};
+    params.timestamp = Date.now();
+    params.recvWindow = 10000;
+    var query = Object.keys(params).map(function(k){ return k + "=" + encodeURIComponent(params[k]); }).join("&");
+    return binanceHmacHex(secret, query).then(function(sig){
+      var url = "https://api.binance.com" + path + "?" + query + "&signature=" + sig;
+      return fetch(url, { method: method||"GET", headers: { "X-MBX-APIKEY": apiKey } });
+    }).then(function(res){
+      return res.json().then(function(body){
+        if(!res.ok) throw new Error((body && body.msg) || ("HTTP " + res.status));
+        return body;
+      });
+    });
+  }
+
+  var BINANCE_STABLES = { "USD":1, "USDT":1, "USDC":1, "BUSD":1, "FDUSD":1, "DAI":1, "TUSD":1 };
+
+  function fetchBinanceHoldings(){
+    var errors = [];
+    var spot = binanceSignedFetch("/api/v3/account", {}).then(function(d){
+      return (d.balances||[]).map(function(b){ return { asset:b.asset, qty:(parseFloat(b.free)||0)+(parseFloat(b.locked)||0) }; });
+    }).catch(function(e){ errors.push("Spot: " + e.message); return []; });
+    var funding = binanceSignedFetch("/sapi/v1/asset/get-funding-asset", {}, "POST").then(function(d){
+      return (d||[]).map(function(b){ return { asset:b.asset, qty:(parseFloat(b.free)||0)+(parseFloat(b.locked)||0)+(parseFloat(b.freeze)||0) }; });
+    }).catch(function(e){ errors.push("Funding: " + e.message); return []; });
+    var earn = binanceSignedFetch("/sapi/v1/simple-earn/flexible/position", {}).then(function(d){
+      return (d.rows||[]).map(function(r){ return { asset:r.asset, qty: parseFloat(r.totalAmount)||0 }; });
+    }).catch(function(e){ errors.push("Earn: " + e.message); return []; });
+    return Promise.all([spot, funding, earn]).then(function(lists){
+      if(errors.length === 3){
+        throw new Error("No se pudo conectar con Binance (revisa tu API key/secret y los permisos de lectura): " + errors[0]);
+      }
+      var byAsset = {};
+      lists.forEach(function(list){
+        list.forEach(function(h){
+          if(h.qty <= 0) return;
+          byAsset[h.asset] = (byAsset[h.asset]||0) + h.qty;
+        });
+      });
+      return byAsset;
+    });
+  }
+
+  function binanceKlineChangePct(symbol, interval, limit){
+    return fetch("https://api.binance.com/api/v3/klines?symbol=" + symbol + "&interval=" + interval + "&limit=" + limit)
+      .then(function(res){ if(!res.ok) throw new Error("HTTP "+res.status); return res.json(); })
+      .then(function(rows){
+        if(!rows || rows.length < 2) return null;
+        var oldClose = parseFloat(rows[0][4]);
+        var newClose = parseFloat(rows[rows.length-1][4]);
+        return oldClose ? ((newClose-oldClose)/oldClose*100) : null;
+      })
+      .catch(function(){ return null; });
+  }
+
+  function fetchBinanceAssetStats(asset){
+    if(BINANCE_STABLES[asset]) return Promise.resolve({ asset:asset, price:1, ch1h:0, ch24h:0, ch1w:0, ch1m:0, ch1y:0 });
+    var symbol = asset + "USDT";
+    var priceP = fetch("https://api.binance.com/api/v3/ticker/price?symbol=" + symbol).then(function(r){ if(!r.ok) throw new Error("no price"); return r.json(); }).then(function(d){ return parseFloat(d.price); });
+    var ch24P = fetch("https://api.binance.com/api/v3/ticker/24hr?symbol=" + symbol).then(function(r){ if(!r.ok) throw new Error("no 24h"); return r.json(); }).then(function(d){ return parseFloat(d.priceChangePercent); });
+    var ch1hP = binanceKlineChangePct(symbol, "1h", 2);
+    var ch1wP = binanceKlineChangePct(symbol, "1d", 8);
+    var ch1mP = binanceKlineChangePct(symbol, "1d", 31);
+    var ch1yP = binanceKlineChangePct(symbol, "1M", 13);
+    return Promise.all([priceP, ch24P, ch1hP, ch1wP, ch1mP, ch1yP]).then(function(r){
+      return { asset:asset, price:r[0], ch24h:r[1], ch1h:r[2], ch1w:r[3], ch1m:r[4], ch1y:r[5] };
+    }).catch(function(){ return { asset:asset, price:null, ch1h:null, ch24h:null, ch1w:null, ch1m:null, ch1y:null }; });
+  }
+
+  function syncBinanceLive(){
+    if(!els.binanceLiveStatus) return;
+    if(!getBinanceKey() || !getBinanceSecret()){
+      els.binanceLiveStatus.textContent = "Conecta tu API key de Binance en Configuración para ver tus holdings en vivo.";
+      showToast("Falta configurar tu API key de Binance en Configuración.");
+      return;
+    }
+    els.binanceLiveStatus.textContent = "Sincronizando con Binance…";
+    fetchBinanceHoldings().then(function(byAsset){
+      var assets = Object.keys(byAsset).filter(function(a){ return byAsset[a] > 0.00000001; });
+      return Promise.all(assets.map(function(a){ return fetchBinanceAssetStats(a).then(function(stats){ stats.qty = byAsset[a]; return stats; }); }));
+    }).then(function(holdings){
+      holdings.sort(function(a,b){ return ((b.price||0)*b.qty) - ((a.price||0)*a.qty); });
+      backup.state.binanceLive = { syncedAt: new Date().toISOString(), holdings: holdings };
+      setDirty(true);
+      renderBinanceLive();
+      showToast("Binance sincronizado.");
+    }).catch(function(err){
+      els.binanceLiveStatus.textContent = "Error al sincronizar: " + err.message;
+    });
+  }
+
+  function renderBinanceLive(){
+    if(!els.binanceLiveTable) return;
+    var live = backup.state.binanceLive;
+    if(!live || !live.holdings || !live.holdings.length){
+      els.binanceLiveTable.innerHTML = "";
+      els.binanceLiveStatus.textContent = getBinanceKey() ? "Sin datos todavía — pulsa \"Sincronizar con Binance\"." : "Conecta tu API key de Binance en Configuración para ver tus holdings en vivo.";
+      els.binanceLiveKpis.innerHTML = "";
+      return;
+    }
+    els.binanceLiveStatus.textContent = "Última sincronización: " + new Date(live.syncedAt).toLocaleString("es-PA");
+    function pctCell(v){
+      if(v == null) return "<td style='color:var(--text-dim)'>—</td>";
+      return "<td style='color:" + (v>=0?"var(--emerald)":"var(--red)") + "'>" + (v>=0?"+":"") + v.toFixed(2) + "%</td>";
+    }
+    var valorActualTotal = 0;
+    var head = "<tr><th style='text-align:left'>Moneda</th><th>Cantidad</th><th>Precio Actual</th><th>Valor Actual</th><th>1h</th><th>24h</th><th>1W</th><th>1M</th><th>1Y</th></tr>";
+    var rows = live.holdings.map(function(h){
+      var valor = (h.price||0) * h.qty;
+      valorActualTotal += valor;
+      return "<tr><td style='text-align:left;font-weight:700;color:var(--text)'>" + escapeHtml(h.asset) + "</td>" +
+        "<td>" + h.qty.toLocaleString(undefined,{maximumFractionDigits:8}) + "</td>" +
+        "<td>" + (h.price!=null?fmtMoney(h.price):"—") + "</td>" +
+        "<td style='font-weight:700;'>" + fmtMoney(valor) + "</td>" +
+        pctCell(h.ch1h) + pctCell(h.ch24h) + pctCell(h.ch1w) + pctCell(h.ch1m) + pctCell(h.ch1y) +
+      "</tr>";
+    }).join("");
+    els.binanceLiveTable.innerHTML = head + rows;
+
+    var binanceInv = findInv("binance");
+    var invertido = (binanceInv && binanceInv.valorInvertido != null) ? binanceInv.valorInvertido : (binanceInv ? binanceInv.value : null);
+    var gp = invertido != null ? (valorActualTotal - invertido) : null;
+    els.binanceLiveKpis.innerHTML =
+      '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">VALOR ACTUAL (BINANCE, EN VIVO)</div><div class="value">' + fmtMoney(valorActualTotal) + '</div><div class="foot">' + live.holdings.length + ' activos</div></div>' +
+      '<div class="summary-card" style="--accent:var(--blue)"><div class="label">VALOR INVERTIDO</div><div class="value" id="binanceInvertidoValue">' + (invertido!=null?fmtMoney(invertido):"—") + '</div><div class="foot"><button class="btn btn-secondary" id="btnEditInvertido" style="padding:2px 8px;font-size:11px;">Editar</button></div></div>' +
+      '<div class="summary-card" style="--accent:' + (gp==null?"var(--text-dim)":(gp>=0?"var(--emerald)":"var(--red)")) + '"><div class="label">GANANCIA / PÉRDIDA</div><div class="value" style="color:' + (gp==null?"inherit":(gp>=0?"var(--emerald)":"var(--red)")) + '">' + (gp!=null?((gp>=0?"+":"")+fmtMoney(gp)):"—") + '</div><div class="foot">' + (gp!=null&&invertido?((gp/invertido*100).toFixed(1)+"%"):"") + '</div></div>';
+
+    var btnEdit = document.getElementById("btnEditInvertido");
+    if(btnEdit){
+      btnEdit.addEventListener("click", function(){
+        var current = invertido!=null ? invertido : valorActualTotal;
+        var v = prompt("Valor invertido en Binance (costo de adquisición, USD):", current.toFixed(2));
+        if(v == null) return;
+        var num = parseFloat(v);
+        if(isNaN(num)) return;
+        var inv = findInv("binance");
+        if(inv){ inv.valorInvertido = num; setDirty(true); renderBinanceLive(); }
+      });
+    }
   }
 
   /* ---------- Motor de ingesta acumulativa multiactivo ---------- */
@@ -3771,6 +3983,9 @@
   function renderConfig(){
     els.cfgApiKey.value = "";
     updateApiKeyStatus();
+    if(els.cfgBinanceKey) els.cfgBinanceKey.value = "";
+    if(els.cfgBinanceSecret) els.cfgBinanceSecret.value = "";
+    updateBinanceKeyStatus();
     populateImportTarget();
     renderIngestLog();
   }
@@ -3788,6 +4003,23 @@
     updateApiKeyStatus();
     showToast("API key eliminada.");
   });
+
+  if(els.btnSaveBinanceKey) els.btnSaveBinanceKey.addEventListener("click", function(){
+    var k = els.cfgBinanceKey.value.trim(), s = els.cfgBinanceSecret.value.trim();
+    if(!k || !s){ showToast("Pega la API key y el API secret antes de guardar."); return; }
+    localStorage.setItem(BINANCE_KEY_STORAGE, k);
+    localStorage.setItem(BINANCE_SECRET_STORAGE, s);
+    els.cfgBinanceKey.value = ""; els.cfgBinanceSecret.value = "";
+    updateBinanceKeyStatus();
+    showToast("API key de Binance guardada en este navegador.");
+  });
+  if(els.btnClearBinanceKey) els.btnClearBinanceKey.addEventListener("click", function(){
+    localStorage.removeItem(BINANCE_KEY_STORAGE);
+    localStorage.removeItem(BINANCE_SECRET_STORAGE);
+    updateBinanceKeyStatus();
+    showToast("API key de Binance eliminada.");
+  });
+  if(els.btnSyncBinance) els.btnSyncBinance.addEventListener("click", syncBinanceLive);
 
   function extractPdfText(file){
     return file.arrayBuffer().then(function(buf){
