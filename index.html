@@ -495,6 +495,10 @@
             <h3>Todas las Inversiones</h3>
             <button id="btnAddRow" class="btn btn-secondary">+ Actualizar</button>
           </div>
+          <div class="tab-bar" id="invTableTabs">
+            <button class="tab-btn on" data-inv-tab="inversiones">Inversiones</button>
+            <button class="tab-btn" data-inv-tab="liquidez">Liquidez</button>
+          </div>
           <table>
             <thead>
               <tr>
@@ -2335,9 +2339,14 @@
     return status || "";
   }
 
+  var invTableTab = "inversiones";
+
   function renderTable(){
     var total = totalPortfolio();
-    var rows = investments().slice().sort(function(a,b){ return (b.value||0)-(a.value||0); });
+    var allRows = investments().slice().sort(function(a,b){ return (b.value||0)-(a.value||0); });
+    var rows = allRows.filter(function(acc){
+      return invTableTab === "liquidez" ? acc.cat === "Liquidez" : acc.cat !== "Liquidez";
+    });
 
     els.invTableBody.innerHTML = rows.map(function(acc){
       var pct = total ? (acc.value/total*100) : 0;
@@ -2356,7 +2365,16 @@
       );
     }).join("");
 
-    els.invTableBody.querySelectorAll("tr").forEach(function(tr){
+    var subtotal = round2(rows.reduce(function(s,acc){ return s + (acc.value||0); }, 0));
+    var subtotalPct = total ? (subtotal/total*100) : 0;
+    els.invTableBody.innerHTML += '<tr style="font-weight:700;border-top:2px solid var(--border);">' +
+      '<td class="name">TOTAL ' + (invTableTab === "liquidez" ? "LIQUIDEZ" : "INVERSIONES") + '</td>' +
+      '<td></td>' +
+      '<td class="num">' + fmtMoney(subtotal) + '</td>' +
+      '<td class="num">' + subtotalPct.toFixed(1) + '%</td>' +
+      '<td></td><td></td></tr>';
+
+    els.invTableBody.querySelectorAll("tr[data-id]").forEach(function(tr){
       tr.addEventListener("click", function(){
         var id = tr.getAttribute("data-id");
         setChartFocus({ type:"investment", id:id });
@@ -2364,6 +2382,15 @@
       });
     });
   }
+
+  document.getElementById("invTableTabs").addEventListener("click", function(e){
+    var btn = e.target.closest(".tab-btn");
+    if(!btn) return;
+    this.querySelectorAll(".tab-btn").forEach(function(b){ b.classList.remove("on"); });
+    btn.classList.add("on");
+    invTableTab = btn.getAttribute("data-inv-tab");
+    renderTable();
+  });
 
   function hexToRgba(hex, alpha){
     var h = hex.replace("#","");
