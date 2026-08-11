@@ -500,6 +500,7 @@
           <div class="tab-bar" id="invTableTabs">
             <button class="tab-btn on" data-inv-tab="inversiones">Inversiones</button>
             <button class="tab-btn" data-inv-tab="liquidez">Liquidez</button>
+            <button class="tab-btn" data-inv-tab="cripto">Cripto</button>
           </div>
           <table>
             <thead>
@@ -2347,7 +2348,9 @@
     var total = totalPortfolio();
     var allRows = investments().slice().sort(function(a,b){ return (b.value||0)-(a.value||0); });
     var rows = allRows.filter(function(acc){
-      return invTableTab === "liquidez" ? acc.cat === "Liquidez" : acc.cat !== "Liquidez";
+      if(invTableTab === "liquidez") return acc.cat === "Liquidez";
+      if(invTableTab === "cripto") return acc.cat === "Cripto";
+      return acc.cat !== "Liquidez" && acc.cat !== "Cripto";
     });
 
     els.invTableBody.innerHTML = rows.map(function(acc){
@@ -2370,7 +2373,7 @@
     var subtotal = round2(rows.reduce(function(s,acc){ return s + (acc.value||0); }, 0));
     var subtotalPct = total ? (subtotal/total*100) : 0;
     els.invTableBody.innerHTML += '<tr style="font-weight:700;border-top:2px solid var(--border);">' +
-      '<td class="name">TOTAL ' + (invTableTab === "liquidez" ? "LIQUIDEZ" : "INVERSIONES") + '</td>' +
+      '<td class="name">TOTAL ' + (invTableTab === "liquidez" ? "LIQUIDEZ" : (invTableTab === "cripto" ? "CRIPTO" : "INVERSIONES")) + '</td>' +
       '<td></td>' +
       '<td class="num">' + fmtMoney(subtotal) + '</td>' +
       '<td class="num">' + subtotalPct.toFixed(1) + '%</td>' +
@@ -3688,6 +3691,8 @@
                     valorLabel:"Capital invertido activo", ingLabel:"Ganancias nuevas cobradas", carLabel:"Cargos" },
     "unfcu":      { label:"UNFCU",                                 kind:"generic",   investmentId:"unfcu",
                     valorLabel:"Saldo del período",   ingLabel:"Interés",                 carLabel:"Cargos" },
+    "binance":    { label:"Binance (Cripto)",                      kind:"generic",   investmentId:"binance",
+                    valorLabel:"Valor total de la cuenta", ingLabel:"Cambio de valor (Change value)", carLabel:"Cargos" },
     "otra_cuenta":{ label:"Otra cuenta (Bancos / Cripto / Liquidez)", kind:"generic-select",
                     valorLabel:"Saldo del período",   ingLabel:"Ingresos",                carLabel:"Cargos" },
     "apto":       { label:"Apartamento (alquiler)",                kind:"inmueble",  inmuebleId:"apto",
