@@ -3178,12 +3178,26 @@
     els.swpComposicionDonut.innerHTML = buildSimpleDonut(SWP_ORDER.map(function(k){ return { label: SWP_LABELS[k], value: comp[k]||0, color: SWP_COLORS[k] }; }));
 
     var efectivoActual = comp.efectivo || 0;
-    var efectivoAnterior = prevComp.efectivo != null ? prevComp.efectivo : efectivoActual;
+    // Preferir el Saldo de Apertura real del Fondo Money Market (Pág.10 del estado de cuenta) sobre el
+    // valor derivado (cierre del periodo anterior) — es la fuente que cuadra de verdad, ya que ahí entran
+    // todos los dividendos antes de aparecer en cualquier otro resumen.
+    var efectivoAperturaReal = d.efectivoApertura;
+    var efectivoAnterior = efectivoAperturaReal != null ? efectivoAperturaReal : (prevComp.efectivo != null ? prevComp.efectivo : efectivoActual);
     var efectivoGp = round2(efectivoActual - efectivoAnterior);
     els.swpEfectivoKpis.innerHTML =
-      '<div class="summary-card" style="--accent:var(--blue)"><div class="label">SALDO DE APERTURA</div><div class="value">' + fmtMoney(efectivoAnterior) + '</div><div class="foot">' + (prevPer ? escapeHtml(prevPer) : '—') + '</div></div>' +
+      '<div class="summary-card" style="--accent:var(--blue)"><div class="label">SALDO DE APERTURA</div><div class="value">' + fmtMoney(efectivoAnterior) + '</div><div class="foot">' + (efectivoAperturaReal != null ? 'Fondo Money Market, ' + escapeHtml(per) : (prevPer ? 'derivado de ' + escapeHtml(prevPer) : '—')) + '</div></div>' +
       '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">SALDO AL CIERRE</div><div class="value">' + fmtMoney(efectivoActual) + '</div><div class="foot">' + escapeHtml(per) + '</div></div>' +
       '<div class="summary-card" style="--accent:' + pctColor(efectivoGp) + '"><div class="label">G/P NO REALIZADA</div><div class="value" style="color:' + pctColor(efectivoGp) + '">' + signMoney(efectivoGp) + '</div><div class="foot">Movimiento neto de efectivo, fondos money market y depósitos disponibles</div></div>';
+
+    if(efectivoAperturaReal != null && prevComp.efectivo != null && Math.abs(efectivoAperturaReal - prevComp.efectivo) > 0.01){
+      els.swpEfectivoKpis.innerHTML += "<div class='alert-banner warn' style='grid-column:1/-1;margin-top:4px;'><div class='at'>⚠ Descuadre</div><div class='ax'>El Saldo de Apertura del Fondo Money Market (" + fmtMoney(efectivoAperturaReal) + ") no coincide con el Saldo al Cierre cargado para " + escapeHtml(prevPer||"el periodo anterior") + " (" + fmtMoney(prevComp.efectivo) + "). Revisa si falta algún movimiento en ese mes.</div></div>";
+    }
+    if(d.efectivoMovimientosLineas && d.efectivoMovimientosLineas.length){
+      els.swpEfectivoKpis.innerHTML += "<div style='grid-column:1/-1;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);'><div style='font-size:11px;color:var(--text-dim);font-weight:700;margin-bottom:4px;'>MOVIMIENTOS DEL FONDO MONEY MARKET (Pág.10)</div>" +
+        d.efectivoMovimientosLineas.map(function(l){
+          return "<div class='sr'><span class='lbl' style='padding-left:10px;'>↳ " + escapeHtml(l.descripcion||"Movimiento") + "</span><span class='val' style='color:" + (l.monto>=0?"var(--emerald)":"var(--red)") + ";font-size:12px;'>" + (l.monto>=0?"+":"−") + fmtMoney(Math.abs(l.monto)) + "</span></div>";
+        }).join("") + "</div>";
+    }
 
     var compHtml = '<div class="sr"><span class="lbl">Periodo actual</span><span class="val">' + escapeHtml(per) + '</span></div>' +
       '<div class="sr"><span class="lbl">Valor total</span><span class="val">' + fmtMoney(d.total) + '</span></div>';
@@ -3768,6 +3782,9 @@
       if(obj.composicion.etf != null) els.ivEtfs.value = obj.composicion.etf;
       if(obj.composicion.alternativos != null) els.ivAlternativos.value = obj.composicion.alternativos;
     }
+    // El Saldo de Cierre del Fondo Money Market (Detalles del Fondo Money Market, Pág.10) es más confiable
+    // que el "efectivo" del resumen general — todos los dividendos entran primero a este fondo.
+    if(obj.efectivoCierreMes != null) els.ivEfectivo.value = obj.efectivoCierreMes;
     pendingPershingPositions = obj.posiciones || null;
     if(els.ivPershingPosSummary){
       if(pendingPershingPositions){
@@ -3785,7 +3802,7 @@
       }
     }
 
-    var hasCashDetail = (obj.ingresosLineas && obj.ingresosLineas.length) || (obj.cargosLineas && obj.cargosLineas.length) || (obj.otrasTransaccionesLineas && obj.otrasTransaccionesLineas.length) || (obj.impuestosRetenidosLineas && obj.impuestosRetenidosLineas.length) || obj.distribucionBlackRock != null || obj.otrasTransacciones != null || obj.impuestosRetenidos != null;
+    var hasCashDetail = (obj.ingresosLineas && obj.ingresosLineas.length) || (obj.cargosLineas && obj.cargosLineas.length) || (obj.otrasTransaccionesLineas && obj.otrasTransaccionesLineas.length) || (obj.impuestosRetenidosLineas && obj.impuestosRetenidosLineas.length) || obj.distribucionBlackRock != null || obj.otrasTransacciones != null || obj.impuestosRetenidos != null || obj.efectivoAperturaMes != null || obj.efectivoCierreMes != null || (obj.efectivoMovimientosLineas && obj.efectivoMovimientosLineas.length);
     pendingPershingCashDetail = hasCashDetail ? {
       ingresosLineas: obj.ingresosLineas || [],
       cargosLineas: obj.cargosLineas || [],
@@ -3794,7 +3811,10 @@
       impuestosRetenidosLineas: obj.impuestosRetenidosLineas || [],
       impuestosRetenidos: obj.impuestosRetenidos,
       distribucionBlackRock: obj.distribucionBlackRock,
-      interesDevengadoRentaFija: obj.interesDevengadoRentaFija
+      interesDevengadoRentaFija: obj.interesDevengadoRentaFija,
+      efectivoApertura: obj.efectivoAperturaMes,
+      efectivoCierre: obj.efectivoCierreMes,
+      efectivoMovimientosLineas: obj.efectivoMovimientosLineas || []
     } : null;
     if(els.ivPershingCashDetail){
       if(pendingPershingCashDetail){
@@ -3812,6 +3832,18 @@
           : "";
         if(pendingPershingCashDetail.distribucionBlackRock == null){
           els.ivPershingCashDetail.innerHTML += "<div style='color:var(--amber);font-size:12px;margin-top:6px;'>⚠ No se detectó la distribución de BlackRock — revisa el PDF manualmente y avísame el monto si aparece.</div>";
+        }
+        if(pendingPershingCashDetail.efectivoApertura != null || pendingPershingCashDetail.efectivoCierre != null){
+          var mmLines = [];
+          if(pendingPershingCashDetail.efectivoApertura != null) mmLines.push("Saldo de Apertura: " + fmtMoney(pendingPershingCashDetail.efectivoApertura));
+          if(pendingPershingCashDetail.efectivoCierre != null) mmLines.push("Saldo de Cierre: " + fmtMoney(pendingPershingCashDetail.efectivoCierre));
+          pendingPershingCashDetail.efectivoMovimientosLineas.forEach(function(l){ if(l.monto) mmLines.push((l.monto>=0?"+":"−") + fmtMoney(Math.abs(l.monto)) + " " + escapeHtml(l.descripcion||"Movimiento")); });
+          els.ivPershingCashDetail.innerHTML += "<div style='margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);font-size:11.5px;color:var(--text-dim);'>Fondo Money Market (Pág.10):</div><div style='font-size:12.5px;line-height:1.9;color:var(--blue)'>" + mmLines.join("<br>") + "</div>";
+          if(obj.composicion && obj.composicion.efectivo != null && pendingPershingCashDetail.efectivoCierre != null && Math.abs(obj.composicion.efectivo - pendingPershingCashDetail.efectivoCierre) > 0.01){
+            els.ivPershingCashDetail.innerHTML += "<div style='color:var(--amber);font-size:12px;margin-top:6px;'>⚠ El Efectivo del resumen general (" + fmtMoney(obj.composicion.efectivo) + ") no coincide con el Saldo de Cierre del fondo Money Market (" + fmtMoney(pendingPershingCashDetail.efectivoCierre) + ") — se usó el del fondo Money Market.</div>";
+          }
+        } else {
+          els.ivPershingCashDetail.innerHTML += "<div style='color:var(--amber);font-size:12px;margin-top:6px;'>⚠ No se detectó \"Detalles del Fondo Money Market\" (Pág.10) — el Efectivo puede no estar cuadrado. Revisa el PDF manualmente.</div>";
         }
       } else {
         els.ivPershingCashDetail.innerHTML = "";
@@ -3924,7 +3956,7 @@
             "4. ingresos: el monto de \"Total de ingresos\" (columna Período Actual) en \"Resumen de Ingresos y Gastos\" — dividendos + intereses de bonos, SIN incluir distribucionBlackRock (son secciones separadas en el documento)\n" +
             "5. cargos: SOLO la sección \"Cargos\" de \"Transacciones por Tipo de Actividad\" (ej. Foreign Custody Fee, Administration Fee) — total de esa fila \"Total de Cargos\" (positivo, ej. si el documento dice \"-$64.50\" reporta 64.50). NO mezcles aquí la sección \"Otras Transacciones\", que va en el campo 12 aparte — son DOS secciones distintas del documento y confundirlas descuadra el cambio neto del portafolio.\n" +
             "6. depositos: depósitos o aportes NUEVOS de efectivo hechos a la cuenta en el periodo (transferencias/ACH/wire entrantes; si no hay, usa 0)\n" +
-            "7. composicion (opcional, si el documento lo muestra por clase de activo): {\"efectivo\":0,\"bonos\":0,\"fondos\":0,\"etf\":0,\"alternativos\":0}\n" +
+            "7. composicion (opcional, si el documento lo muestra por clase de activo): {\"efectivo\":0,\"bonos\":0,\"fondos\":0,\"etf\":0,\"alternativos\":0} — para \"efectivo\" usa el mismo valor que reportes en \"efectivoCierreMes\" (campo 16), NO un estimado del resumen general.\n" +
             "8. ingresosLineas: arreglo con CADA línea de \"Resumen de Ingresos y Gastos\" tal como aparece (columna Período Actual), ej: [{\"descripcion\":\"Fondos Money Market\",\"monto\":0},{\"descripcion\":\"Intereses de Bonos\",\"monto\":0}] — no incluyas aquí la distribución de BlackRock, esa va en el campo \"distribucionBlackRock\"\n" +
             "9. cargosLineas: arreglo con CADA cargo/comisión individual de la sección \"Cargos\" en \"Transacciones por Tipo de Actividad\", con su descripción literal, ej: [{\"descripcion\":\"Foreign Custody Fee\",\"monto\":2.00},{\"descripcion\":\"Administration Fee\",\"monto\":62.50}]\n" +
             "10. interesDevengadoRentaFija: interés ACUMULADO/DEVENGADO (columna \"Intereses Devengados\" en la tabla de transacciones, no pagado en efectivo todavía) de los bonos, si aparece como cifra separada (informativo, NO se suma a \"ingresos\")\n" +
@@ -3937,8 +3969,11 @@
             "13. otrasTransaccionesLineas: arreglo con CADA línea individual de la sección \"Otras Transacciones\", ej: [{\"descripcion\":\"Portfolio Performance - Online Plus\",\"monto\":12.00}]\n" +
             "14. impuestosRetenidos: busca en \"Transacciones por Tipo de Actividad\" la sección \"Impuestos Retenidos\" (ej. \"NON-RESIDENT ALIEN TAX\") y toma el segundo número (columna Monto) de su fila \"Total de Impuestos Retenidos\". Es una sección SEPARADA de \"Cargos\" y de \"Otras Transacciones\" — las tres existen independientemente en el documento. Si no aparece, usa 0.\n" +
             "15. impuestosRetenidosLineas: arreglo con CADA línea individual de \"Impuestos Retenidos\", ej: [{\"descripcion\":\"Non-Resident Alien Tax\",\"monto\":7.76}]\n" +
-            "IMPORTANTE: \"Cargos\", \"Otras Transacciones\" e \"Impuestos Retenidos\" son TRES secciones separadas del documento, cada una con su propio \"Total de [sección]\" — no las combines entre sí, ni te saltes ninguna aunque el monto parezca pequeño: si falta alguna, el cambio neto del portafolio queda descuadrado. Si alguna sección no aparece en el documento, omítela o déjala como arreglo/objeto vacío — NO inventes posiciones, cargos ni cifras que no estén literalmente en el texto. Responde SOLO con el JSON, sin texto adicional."
-          + "\n\nEjemplo del formato de respuesta esperado (con datos de ejemplo, no los copies):\n{\"periodo\":\"2026-05\",\"total\":222218.47,\"distribucionBlackRock\":665.36,\"ingresos\":704.13,\"cargos\":64.50,\"depositos\":0,\"composicion\":{},\"ingresosLineas\":[{\"descripcion\":\"Fondos Money Market\",\"monto\":20.38},{\"descripcion\":\"Intereses de Bonos\",\"monto\":683.75}],\"cargosLineas\":[{\"descripcion\":\"Foreign Custody Fee\",\"monto\":2.00},{\"descripcion\":\"Administration Fee\",\"monto\":62.50}],\"otrasTransacciones\":12.00,\"otrasTransaccionesLineas\":[{\"descripcion\":\"Portfolio Performance - Online Plus\",\"monto\":12.00}],\"impuestosRetenidos\":7.76,\"impuestosRetenidosLineas\":[{\"descripcion\":\"Non-Resident Alien Tax\",\"monto\":7.76}],\"posiciones\":{}}"
+            "16. efectivoAperturaMes: busca la sección \"Detalles del Fondo Money Market\" (o \"Money Market Fund Details\", normalmente cerca de la página 10) y toma el \"Saldo de Apertura\"/\"Opening Balance\" de ese fondo — este dato es CLAVE para cuadrar el Efectivo: TODOS los dividendos y distribuciones entran a este fondo antes de aparecer en cualquier otro resumen.\n" +
+            "17. efectivoCierreMes: de la misma sección \"Detalles del Fondo Money Market\", el \"Saldo de Cierre\"/\"Closing Balance\".\n" +
+            "18. efectivoMovimientosLineas: arreglo con CADA entrada y salida individual listada en \"Detalles del Fondo Money Market\" (depósitos, dividendos recibidos, cargos pagados desde este fondo, retiros, etc.), ej: [{\"descripcion\":\"Dividend Reinvestment\",\"monto\":698.25},{\"descripcion\":\"Foreign Custody Fee\",\"monto\":-2.00}]. Si no encuentras esta sección en el documento, deja efectivoAperturaMes/efectivoCierreMes en null y el arreglo vacío — NO inventes cifras.\n" +
+            "IMPORTANTE: \"Cargos\", \"Otras Transacciones\" e \"Impuestos Retenidos\" son TRES secciones separadas del documento, cada una con su propio \"Total de [sección]\" — no las combines entre sí, ni te saltes ninguna aunque el monto parezca pequeño: si falta alguna, el cambio neto del portafolio queda descuadrado. \"Detalles del Fondo Money Market\" es OTRA sección distinta (normalmente varias páginas después) que existe específicamente para cuadrar el Efectivo — búscala siempre, no asumas que el \"efectivo\" del resumen general (página 2) ya es correcto. Si alguna sección no aparece en el documento, omítela o déjala como arreglo/objeto vacío — NO inventes posiciones, cargos ni cifras que no estén literalmente en el texto. Responde SOLO con el JSON, sin texto adicional."
+          + "\n\nEjemplo del formato de respuesta esperado (con datos de ejemplo, no los copies):\n{\"periodo\":\"2026-05\",\"total\":222218.47,\"distribucionBlackRock\":665.36,\"ingresos\":704.13,\"cargos\":64.50,\"depositos\":0,\"composicion\":{},\"ingresosLineas\":[{\"descripcion\":\"Fondos Money Market\",\"monto\":20.38},{\"descripcion\":\"Intereses de Bonos\",\"monto\":683.75}],\"cargosLineas\":[{\"descripcion\":\"Foreign Custody Fee\",\"monto\":2.00},{\"descripcion\":\"Administration Fee\",\"monto\":62.50}],\"otrasTransacciones\":12.00,\"otrasTransaccionesLineas\":[{\"descripcion\":\"Portfolio Performance - Online Plus\",\"monto\":12.00}],\"impuestosRetenidos\":7.76,\"impuestosRetenidosLineas\":[{\"descripcion\":\"Non-Resident Alien Tax\",\"monto\":7.76}],\"efectivoAperturaMes\":10061.35,\"efectivoCierreMes\":10315.12,\"efectivoMovimientosLineas\":[{\"descripcion\":\"Dividend Reinvestment\",\"monto\":698.25},{\"descripcion\":\"Foreign Custody Fee\",\"monto\":-2.00}],\"posiciones\":{}}"
           : isSwLocal
           ? "Este es el texto extraído de un estado de cuenta de SweetWater Securities (bonos locales panameños, renta fija + acciones preferidas):\n\n" + pdfPreviewText +
             "\n\nEl documento tiene estas secciones — úsalas como guía:\n" +
@@ -4176,6 +4211,8 @@
         if((pendingPershingCashDetail.impuestosRetenidosLineas||[]).length) ph[per].impuestosRetenidosLineas = pendingPershingCashDetail.impuestosRetenidosLineas;
         if(distribucionBlackRockDelMes != null) ph[per].distribucionBlackRock = distribucionBlackRockDelMes;
         if(pendingPershingCashDetail.interesDevengadoRentaFija != null) ph[per].interesDevengadoRentaFija = pendingPershingCashDetail.interesDevengadoRentaFija;
+        if(pendingPershingCashDetail.efectivoApertura != null) ph[per].efectivoApertura = pendingPershingCashDetail.efectivoApertura;
+        if((pendingPershingCashDetail.efectivoMovimientosLineas||[]).length) ph[per].efectivoMovimientosLineas = pendingPershingCashDetail.efectivoMovimientosLineas;
         pendingPershingCashDetail = null;
       }
       var accP = findInv(t.investmentId);
