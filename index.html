@@ -930,8 +930,9 @@
         <div class="charts-row">
           <div class="chart-card">
             <h3>Composición por Clase de Activo</h3>
-            <p class="sub">&nbsp;</p>
-            <div id="swpComposicion"></div>
+            <p class="sub">Base Anterior + G/Pérdida del mes = Valor de Mercado actual</p>
+            <div class="matrix-wrap"><table class="matrix" id="swpComposicionTable" style="font-size:12.5px;"></table></div>
+            <div id="swpComposicionDonut" style="margin-top:16px;"></div>
           </div>
           <div class="chart-card">
             <h3>Comparación vs Periodo Anterior</h3>
@@ -944,14 +945,18 @@
           <h3 style="margin:0 0 4px;">Detalle Posición por Posición</h3>
           <p class="sub" style="margin:0 0 14px;" id="swpPosicionesAsOf">&nbsp;</p>
           <div class="tab-bar" id="swpPosTabs">
-            <button class="tab-btn on" data-tab="fondos">Fondos Mutuos</button>
+            <button class="tab-btn on" data-tab="efectivo">Efectivo</button>
+            <button class="tab-btn" data-tab="fondos">Fondos Mutuos</button>
             <button class="tab-btn" data-tab="bonos">Bonos Corp.</button>
             <button class="tab-btn" data-tab="etfs">ETFs</button>
             <button class="tab-btn" data-tab="blackrock">BlackRock</button>
             <button class="tab-btn" data-tab="historial">Historial</button>
           </div>
 
-          <div class="tab-panel on" data-panel="fondos" id="swpPanelFondos">
+          <div class="tab-panel on" data-panel="efectivo" id="swpPanelEfectivo">
+            <div class="kpi-grid-3" id="swpEfectivoKpis"></div>
+          </div>
+          <div class="tab-panel" data-panel="fondos" id="swpPanelFondos">
             <div class="matrix-wrap"><table class="matrix" id="swpFondosTable" style="font-size:12.5px;"></table></div>
           </div>
           <div class="tab-panel" data-panel="bonos" id="swpPanelBonos">
@@ -1239,7 +1244,9 @@
     swpConsYearSelector: document.getElementById("swpConsYearSelector"),
     swpConsMesesTable: document.getElementById("swpConsMesesTable"),
     swpKpis: document.getElementById("swpKpis"),
-    swpComposicion: document.getElementById("swpComposicion"),
+    swpComposicionTable: document.getElementById("swpComposicionTable"),
+    swpComposicionDonut: document.getElementById("swpComposicionDonut"),
+    swpEfectivoKpis: document.getElementById("swpEfectivoKpis"),
     swpComparacion: document.getElementById("swpComparacion"),
     swpPosicionesAsOf: document.getElementById("swpPosicionesAsOf"),
     swpFondosTable: document.getElementById("swpFondosTable"),
@@ -2966,6 +2973,31 @@
   }
   function round2(n){ return Math.round((n||0)*100)/100; }
 
+  function buildSimpleDonut(items){
+    var segs = items.filter(function(s){ return s.value > 0; });
+    var total = segs.reduce(function(s,x){ return s+x.value; }, 0);
+    var size = 180, r = 62, sw = 24, cx = size/2, cy = size/2;
+    var circumference = 2*Math.PI*r;
+    var cum = 0;
+    var arcs = segs.map(function(s){
+      var frac = total ? s.value/total : 0;
+      var len = frac*circumference;
+      var dashoffset = -cum*circumference;
+      cum += frac;
+      return '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="' + s.color + '" ' +
+        'stroke-width="' + sw + '" stroke-dasharray="' + len + ' ' + (circumference-len) + '" ' +
+        'stroke-dashoffset="' + dashoffset + '" transform="rotate(-90 ' + cx + ' ' + cy + ')"/>';
+    });
+    var svg = '<svg width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size + '">' +
+      '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="var(--panel-header)" stroke-width="' + sw + '"/>' +
+      arcs.join("") + '</svg>';
+    var legend = segs.map(function(s){
+      var pct = total ? (s.value/total*100) : 0;
+      return '<div class="legend-item"><span class="legend-dot" style="background:' + s.color + '"></span>' + escapeHtml(s.label) + ' · ' + pct.toFixed(1) + '%</div>';
+    }).join("");
+    return '<div class="donut-wrap">' + svg + '<div class="legend">' + legend + '</div></div>';
+  }
+
   // Dos conceptos separados, replicando la hoja de calculo de referencia del usuario:
   // 1) Portafolio: Saldo Inicial + Depositos = Total Invertido (costo acumulado); Cambio Mercado = variacion de precio del periodo;
   //    G/P Instrumento = Total Invertido + Cambio Mercado; Rendimiento = Cambio Mercado / Total Invertido.
@@ -3129,12 +3161,29 @@
       '<div class="summary-card" style="--accent:' + (chg>=0?'var(--emerald)':'var(--red)') + '"><div class="label">CAMBIO NETO (MERCADO)</div><div class="value" style="color:' + (chg>=0?'var(--emerald)':'var(--red)') + '">' + (chg>=0?'+':'') + fmtMoney(chg) + '</div><div class="foot">' + (prevPer ? 'vs ' + escapeHtml(prevPer) : '') + ' — variación de precio, sin efectivo</div></div>';
 
     var comp = d.composicion || {};
-    els.swpComposicion.innerHTML = SWP_ORDER.map(function(k){
-      var val = comp[k] || 0;
-      var pct = d.total ? (val/d.total*100) : 0;
-      return '<div class="comp-item"><div class="comp-row"><span>' + SWP_LABELS[k] + '</span><span style="font-weight:700">' + fmtMoney(val) + ' · ' + pct.toFixed(1) + '%</span></div>' +
-        '<div class="comp-track"><div class="comp-fill" style="width:' + pct.toFixed(1) + '%;background:' + SWP_COLORS[k] + '"></div></div></div>';
+    var prevComp = (prevD && prevD.composicion) || {};
+    var compHead = "<tr><th style='text-align:left'>Categoría</th><th>Base Anterior</th><th>G/Pérdida Mes</th><th>Valor Mercado</th><th>% Portafolio</th></tr>";
+    var compRows = SWP_ORDER.map(function(k){
+      var valorActual = comp[k] || 0;
+      var baseAnterior = prevComp[k] != null ? prevComp[k] : valorActual;
+      var gpMes = round2(valorActual - baseAnterior);
+      var pct = d.total ? (valorActual/d.total*100) : 0;
+      return "<tr><td style='text-align:left;font-weight:700;color:var(--text)'><span style='display:inline-block;width:9px;height:9px;border-radius:2px;background:" + SWP_COLORS[k] + ";margin-right:6px;'></span>" + SWP_LABELS[k] + "</td>" +
+        "<td>" + fmtMoney(baseAnterior) + "</td>" +
+        "<td style='color:" + pctColor(gpMes) + "'>" + signMoney(gpMes) + "</td>" +
+        "<td style='font-weight:700;'>" + fmtMoney(valorActual) + "</td>" +
+        "<td>" + pct.toFixed(1) + "%</td></tr>";
     }).join("");
+    els.swpComposicionTable.innerHTML = compHead + compRows;
+    els.swpComposicionDonut.innerHTML = buildSimpleDonut(SWP_ORDER.map(function(k){ return { label: SWP_LABELS[k], value: comp[k]||0, color: SWP_COLORS[k] }; }));
+
+    var efectivoActual = comp.efectivo || 0;
+    var efectivoAnterior = prevComp.efectivo != null ? prevComp.efectivo : efectivoActual;
+    var efectivoGp = round2(efectivoActual - efectivoAnterior);
+    els.swpEfectivoKpis.innerHTML =
+      '<div class="summary-card" style="--accent:var(--blue)"><div class="label">SALDO DE APERTURA</div><div class="value">' + fmtMoney(efectivoAnterior) + '</div><div class="foot">' + (prevPer ? escapeHtml(prevPer) : '—') + '</div></div>' +
+      '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">SALDO AL CIERRE</div><div class="value">' + fmtMoney(efectivoActual) + '</div><div class="foot">' + escapeHtml(per) + '</div></div>' +
+      '<div class="summary-card" style="--accent:' + pctColor(efectivoGp) + '"><div class="label">G/P NO REALIZADA</div><div class="value" style="color:' + pctColor(efectivoGp) + '">' + signMoney(efectivoGp) + '</div><div class="foot">Movimiento neto de efectivo, fondos money market y depósitos disponibles</div></div>';
 
     var compHtml = '<div class="sr"><span class="lbl">Periodo actual</span><span class="val">' + escapeHtml(per) + '</span></div>' +
       '<div class="sr"><span class="lbl">Valor total</span><span class="val">' + fmtMoney(d.total) + '</span></div>';
