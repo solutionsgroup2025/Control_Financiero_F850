@@ -3767,29 +3767,28 @@
 
   var BINANCE_STABLES = { "USD":1, "USDT":1, "USDC":1, "BUSD":1, "FDUSD":1, "DAI":1, "TUSD":1 };
 
+  // Binance NO habilita CORS para /sapi/* (Funding wallet, Simple Earn, etc.) — cualquier
+  // llamada directa desde el navegador a esas rutas es bloqueada por el propio Binance antes
+  // de llegar a nuestro código (confirmado con preflight OPTIONS: devuelven 403 sin cabeceras
+  // access-control-*). Solo /api/v3/account (Spot) sí soporta CORS. Por eso Spot se trae en
+  // vivo, y Funding + Earn (donde suele estar la mayoría del valor, ej. BTC) se completan con
+  // el último saldo por moneda cargado manualmente (investments.binance.manualHoldings), que
+  // se actualiza subiendo el estado de cuenta.
   function fetchBinanceHoldings(){
-    var errors = [];
-    var spot = binanceSignedFetch("/api/v3/account", {}).then(function(d){
+    var spotFailed = false;
+    var spotErrMsg = "";
+    return binanceSignedFetch("/api/v3/account", {}).then(function(d){
       return (d.balances||[]).map(function(b){ return { asset:b.asset, qty:(parseFloat(b.free)||0)+(parseFloat(b.locked)||0) }; });
-    }).catch(function(e){ errors.push("Spot: " + e.message); return []; });
-    var funding = binanceSignedFetch("/sapi/v1/asset/get-funding-asset", {}, "POST").then(function(d){
-      return (d||[]).map(function(b){ return { asset:b.asset, qty:(parseFloat(b.free)||0)+(parseFloat(b.locked)||0)+(parseFloat(b.freeze)||0) }; });
-    }).catch(function(e){ errors.push("Funding: " + e.message); return []; });
-    var earn = binanceSignedFetch("/sapi/v1/simple-earn/flexible/position", {}).then(function(d){
-      return (d.rows||[]).map(function(r){ return { asset:r.asset, qty: parseFloat(r.totalAmount)||0 }; });
-    }).catch(function(e){ errors.push("Earn: " + e.message); return []; });
-    return Promise.all([spot, funding, earn]).then(function(lists){
-      if(errors.length === 3){
-        throw new Error("No se pudo conectar con Binance (revisa tu API key/secret y los permisos de lectura): " + errors[0]);
+    }).catch(function(e){ spotFailed = true; spotErrMsg = e.message; return []; }).then(function(spotList){
+      var binanceInv = findInv("binance");
+      var manual = (binanceInv && binanceInv.manualHoldings) || [];
+      if(spotFailed && !manual.length){
+        throw new Error("No se pudo conectar con Binance (revisa tu API key/secret y los permisos de lectura): " + spotErrMsg);
       }
       var byAsset = {};
-      lists.forEach(function(list){
-        list.forEach(function(h){
-          if(h.qty <= 0) return;
-          byAsset[h.asset] = (byAsset[h.asset]||0) + h.qty;
-        });
-      });
-      return byAsset;
+      spotList.forEach(function(h){ if(h.qty>0) byAsset[h.asset] = (byAsset[h.asset]||0) + h.qty; });
+      manual.forEach(function(h){ if((h.qty||0)>0) byAsset[h.asset] = (byAsset[h.asset]||0) + h.qty; });
+      return { byAsset: byAsset, spotFailed: spotFailed, manualAsOf: binanceInv && binanceInv.manualHoldingsAsOf };
     });
   }
 
@@ -3827,12 +3826,15 @@
       return;
     }
     els.binanceLiveStatus.textContent = "Sincronizando con Binance…";
-    fetchBinanceHoldings().then(function(byAsset){
+    var spotFailedFlag = false, manualAsOfVal = null;
+    fetchBinanceHoldings().then(function(res){
+      spotFailedFlag = res.spotFailed; manualAsOfVal = res.manualAsOf;
+      var byAsset = res.byAsset;
       var assets = Object.keys(byAsset).filter(function(a){ return byAsset[a] > 0.00000001; });
       return Promise.all(assets.map(function(a){ return fetchBinanceAssetStats(a).then(function(stats){ stats.qty = byAsset[a]; return stats; }); }));
     }).then(function(holdings){
       holdings.sort(function(a,b){ return ((b.price||0)*b.qty) - ((a.price||0)*a.qty); });
-      backup.state.binanceLive = { syncedAt: new Date().toISOString(), holdings: holdings };
+      backup.state.binanceLive = { syncedAt: new Date().toISOString(), holdings: holdings, spotFailed: spotFailedFlag, manualAsOf: manualAsOfVal };
       setDirty(true);
       renderBinanceLive();
       showToast("Binance sincronizado.");
@@ -3850,7 +3852,10 @@
       els.binanceLiveKpis.innerHTML = "";
       return;
     }
-    els.binanceLiveStatus.textContent = "Última sincronización: " + new Date(live.syncedAt).toLocaleString("es-PA");
+    var statusMsg = "Última sincronización: " + new Date(live.syncedAt).toLocaleString("es-PA") + " · Spot en vivo";
+    statusMsg += live.manualAsOf ? " · Funding/Earn (ej. BTC) desde el estado de cuenta al " + escapeHtml(live.manualAsOf) + " (Binance no permite consultarlos en vivo desde el navegador)" : "";
+    if(live.spotFailed) statusMsg = "⚠ No se pudo leer Spot en vivo (revisa la API key) — mostrando solo lo cargado desde el estado de cuenta (" + escapeHtml(live.manualAsOf||"—") + ").";
+    els.binanceLiveStatus.textContent = statusMsg;
     function pctCell(v){
       if(v == null) return "<td style='color:var(--text-dim)'>—</td>";
       return "<td style='color:" + (v>=0?"var(--emerald)":"var(--red)") + "'>" + (v>=0?"+":"") + v.toFixed(2) + "%</td>";
