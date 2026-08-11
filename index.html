@@ -1480,6 +1480,25 @@
     var d = new Date();
     return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
   }
+  function bondRateFromName(instrumento){
+    var m = (instrumento||"").match(/(\d+(?:\.\d+)?)\s*%/);
+    return m ? parseFloat(m[1]) : null;
+  }
+  // Cupón semestral anclado en la fecha de vencimiento (mismo día/mes, cada 6 meses) — asume
+  // pago semestral, el esquema estándar de bonos corporativos (confirmado por el usuario).
+  function bondNextCouponDate(vencimientoStr){
+    if(!vencimientoStr) return null;
+    var venc = new Date(vencimientoStr + "T00:00:00");
+    var today = new Date();
+    if(isNaN(venc.getTime()) || venc < today) return null;
+    var d = new Date(venc);
+    while(true){
+      var prev = new Date(d);
+      prev.setMonth(prev.getMonth()-6);
+      if(prev >= today){ d = prev; } else { break; }
+    }
+    return d;
+  }
   function showToast(msg){
     els.toast.textContent = msg;
     els.toast.classList.add("show");
@@ -2524,7 +2543,8 @@
     var aptoBruto = alquileresAnio.reduce(function(s,a){ return s+(a.monto||0); },0);
     var hoy = new Date();
     var mesesTranscurridos = (String(hoy.getFullYear())===flujoAnioSel) ? (hoy.getMonth()+1) : 12;
-    var aptoCargosEstimado = aptoCostoMensual * mesesTranscurridos;
+    var aptoRentado = alquileresAnio.length > 0;
+    var aptoCargosEstimado = aptoRentado ? (aptoCostoMensual * mesesTranscurridos) : 0;
 
     var rows = [
       rowAcumulado("SW Local (bonos)", "Cupones", swAnio),
@@ -2532,7 +2552,14 @@
       rowSnapshot("Profuturo", "Réditos", prof && prof.flujoMensual),
       rowSnapshot("UNFCU", "Interés", un && un.flujoMensual)
     ];
-    rows.push({ name:"Apartamento", tipo:"Alquiler", bruto:aptoBruto, cargos:aptoCargosEstimado, neto:aptoBruto-aptoCargosEstimado, per:null, pending: alquileresAnio.length===0, estimadoCargos:true });
+    rows.push({ name:"Apartamento", tipo:"Alquiler", bruto:aptoBruto, cargos:aptoCargosEstimado, neto: aptoRentado ? (aptoBruto-aptoCargosEstimado) : null, per:null, pending: !aptoRentado, estimadoCargos:true });
+
+    var globalMax = findInv("global_max");
+    if(globalMax){
+      var gmTasa = globalMax.tasaAnual != null ? globalMax.tasaAnual : 0.04;
+      var gmInteresAnual = round2(globalMax.value * gmTasa);
+      rows.push({ name:"Global Max (" + (gmTasa*100).toFixed(1) + "%)", tipo:"Interés", bruto:gmInteresAnual, cargos:0, neto:gmInteresAnual, per:null, estimadoProyeccion:true });
+    }
 
     var totBruto = rows.reduce(function(s,r){return s+r.bruto;},0);
     var totCargos = rows.reduce(function(s,r){return s+r.cargos;},0);
@@ -2546,6 +2573,8 @@
           : '<span class="pill" style="background:' + hexToRgba("#f59e0b",0.15) + ';color:#f59e0b">Sin datos ' + escapeHtml(flujoAnioSel) + '</span>';
       } else if(r.pending){
         badge = '<span class="pill" style="background:' + hexToRgba("#f59e0b",0.15) + ';color:#f59e0b">Sin alquiler registrado ' + escapeHtml(flujoAnioSel) + '</span>';
+      } else if(r.estimadoProyeccion){
+        badge = '<span class="pill" style="background:' + hexToRgba("#7c93ad",0.18) + ';color:var(--text-muted)">Proyección (capital × tasa anual)</span>';
       } else if(r.estimadoCargos){
         badge = '<span class="pill" style="background:' + hexToRgba("#7c93ad",0.18) + ';color:var(--text-muted)">Cargos estimados</span>';
       } else {
@@ -2557,7 +2586,7 @@
         '<td>' + escapeHtml(r.tipo) + '</td>' +
         '<td class="num">' + (r.bruto>0 ? fmtMoney(r.bruto) : "—") + '</td>' +
         '<td class="num" style="color:' + (r.cargos>0?"var(--red)":"var(--text-muted)") + '">' + (r.cargos>0 ? "-"+fmtMoney(r.cargos) : "$0.00") + '</td>' +
-        '<td class="num" style="font-weight:700;color:' + (r.neto>=0?"var(--emerald)":"var(--red)") + '">' + fmtMoney(r.neto) + '</td>' +
+        '<td class="num" style="font-weight:700;color:' + (r.neto==null?"var(--text-muted)":(r.neto>=0?"var(--emerald)":"var(--red)")) + '">' + (r.neto==null?"—":fmtMoney(r.neto)) + '</td>' +
         '<td class="num">' + (r.bruto>0 ? pctReditoRow.toFixed(1)+"%" : "—") + '</td>' +
         '<td>' + badge + '</td>' +
       '</tr>';
@@ -3367,14 +3396,19 @@
     var fTotRow = "<tr class='matrix-total'><td>TOTAL FONDOS MUTUOS</td><td></td><td></td><td>" + fmtMoney(fTot.baseCosto) + "</td><td></td><td>" + fmtMoney(fTot.valorMkt) + "</td><td style='color:var(--emerald)'>+" + fmtMoney(fTot.gpNoReal) + "</td></tr>";
     els.swpFondosTable.innerHTML = fHead + fRows + fTotRow;
 
-    var bHead = "<tr><th style='text-align:left'>Instrumento</th><th>Cantidad</th><th>Costo Unit.</th><th>Base Costo</th><th>Precio Mkt</th><th>Valor Mkt</th><th>G/P No Real.</th><th>Int. Dev.</th></tr>";
+    var bHead = "<tr><th style='text-align:left'>Instrumento</th><th>Cantidad</th><th>Costo Unit.</th><th>Base Costo</th><th>Precio Mkt</th><th>Valor Mkt</th><th>G/P No Real.</th><th>Int. Dev.</th><th>Tasa</th><th>Próx. Cupón</th></tr>";
     var bRows = (p.bonosCorp||[]).map(function(b){
+      var tasa = bondRateFromName(b.instrumento);
+      var proxCupon = bondNextCouponDate(b.vencimiento);
+      var montoCupon = tasa!=null ? round2(b.cantidad * (tasa/100) / 2) : null;
       return "<tr><td><div style='font-weight:700'>" + escapeHtml(b.instrumento) + "</div><div style='font-size:10px;color:var(--text-dim)'>Vto: " + fmtDate(b.vencimiento) + " · CUSIP: " + escapeHtml(b.cusip) + "</div></td>" +
         "<td>" + b.cantidad.toLocaleString() + "</td><td>$" + b.costoUnit.toFixed(2) + "</td><td>" + fmtMoney(b.baseCosto) + "</td><td>$" + b.precioMkt.toFixed(2) + "</td><td>" + fmtMoney(b.valorMkt) + "</td>" +
-        "<td style='color:" + (b.gpNoReal>=0?"var(--emerald)":"var(--red)") + "'>" + (b.gpNoReal>=0?"+":"") + fmtMoney(b.gpNoReal) + "</td><td style='color:var(--amber)'>" + fmtMoney(b.interesDevengado) + "</td></tr>";
+        "<td style='color:" + (b.gpNoReal>=0?"var(--emerald)":"var(--red)") + "'>" + (b.gpNoReal>=0?"+":"") + fmtMoney(b.gpNoReal) + "</td><td style='color:var(--amber)'>" + fmtMoney(b.interesDevengado) + "</td>" +
+        "<td>" + (tasa!=null?tasa.toFixed(3)+"%":"—") + "</td>" +
+        "<td>" + (proxCupon ? "<div>"+fmtDate(proxCupon.toISOString().slice(0,10))+"</div><div style='font-size:10px;color:var(--emerald)'>+"+fmtMoney(montoCupon)+"</div>" : "—") + "</td></tr>";
     }).join("");
     var bTot = p.totalBonosCorp || {};
-    var bTotRow = "<tr class='matrix-total'><td>TOTAL BONOS</td><td>" + (bTot.cantidad||0).toLocaleString() + "</td><td></td><td>" + fmtMoney(bTot.baseCosto) + "</td><td></td><td>" + fmtMoney(bTot.valorMkt) + "</td><td style='color:var(--emerald)'>+" + fmtMoney(bTot.gpNoReal) + "</td><td style='color:var(--amber)'>" + fmtMoney(bTot.interesDevengado) + "</td></tr>";
+    var bTotRow = "<tr class='matrix-total'><td>TOTAL BONOS</td><td>" + (bTot.cantidad||0).toLocaleString() + "</td><td></td><td>" + fmtMoney(bTot.baseCosto) + "</td><td></td><td>" + fmtMoney(bTot.valorMkt) + "</td><td style='color:var(--emerald)'>+" + fmtMoney(bTot.gpNoReal) + "</td><td style='color:var(--amber)'>" + fmtMoney(bTot.interesDevengado) + "</td><td></td><td></td></tr>";
     els.swpBonosTable.innerHTML = bHead + bRows + bTotRow;
 
     var eHead = "<tr><th style='text-align:left'>ETF</th><th>Acciones</th><th>Costo Unit.</th><th>Base Costo</th><th>Precio Mkt</th><th>Valor Mkt</th><th>G/P No Real.</th></tr>";
