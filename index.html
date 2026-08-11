@@ -135,6 +135,8 @@
   .summary-card .foot{font-size:12px;color:var(--text-muted);}
   .summary-card .foot.up{color:var(--emerald);font-weight:600;}
   .summary-card .foot.up::before{content:"▲ ";}
+  .summary-card .foot.down{color:var(--red);font-weight:600;}
+  .summary-card .foot.down::before{content:"▼ ";}
 
   /* ---------- charts ---------- */
   .charts-row{display:grid;grid-template-columns:2.1fr 1fr;gap:16px;margin-bottom:20px;align-items:stretch;}
@@ -2001,7 +2003,7 @@
 
     var cards = [
       {accent:"var(--emerald)", label:"Portafolio Total", value:fmtMoney(total),
-       foot:'<span class="foot up">' + fmtMoney(Math.abs(diff)) + " (" + Math.abs(diffPct).toFixed(1) + "%) vs período anterior</span>"},
+       foot:'<span class="foot ' + (diff>=0?"up":"down") + '">' + fmtMoney(Math.abs(diff)) + " (" + Math.abs(diffPct).toFixed(1) + "%) vs período anterior</span>"},
       {accent:"var(--blue)", label:"Patrimonio Neto", value:fmtMoney(netWorth),
        foot:"Portafolio – Hipotecas documentadas"},
       {accent:"var(--amber)", label:"Liquidez Disponible", value:fmtMoney(liquidez),
@@ -3739,8 +3741,10 @@
     var label = monthLabel(per);
     var total = totalPortfolio();
     var hist = backup.state.history || (backup.state.history = []);
-    if(hist.length && hist[hist.length-1].label === label){
-      hist[hist.length-1].value = total;
+    var existingIdx = -1;
+    for(var hi=0; hi<hist.length; hi++){ if(hist[hi].label === label){ existingIdx = hi; break; } }
+    if(existingIdx !== -1){
+      hist[existingIdx].value = total;
     }else{
       hist.push({ label:label, value: total });
     }
