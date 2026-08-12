@@ -606,6 +606,12 @@
         </div>
 
         <div class="table-card" style="padding:20px 22px;margin-top:16px;">
+          <h3 style="margin:0 0 4px;">💸 Cargos y Comisiones de la Plataforma</h3>
+          <p class="sub" style="margin:0 0 14px;">Deducciones del "Extracto de Transacciones" del periodo seleccionado arriba (Administration Charge, Establishment Charge, Servicing Charge, Financial Adviser Fee, etc.)</p>
+          <div id="rl360CargosDetail"></div>
+        </div>
+
+        <div class="table-card" style="padding:20px 22px;margin-top:16px;">
           <h3 style="margin:0 0 4px;">📊 Análisis Consolidado — Comportamiento por Año</h3>
           <p class="sub" style="margin:0 0 14px;" id="rl360ConsNote">&nbsp;</p>
           <div class="matrix-wrap" style="margin-bottom:20px;"><table class="matrix" id="rl360ConsAnualTable" style="font-size:12.5px;"></table></div>
@@ -1323,6 +1329,7 @@
     rl360ComposicionTable: document.getElementById("rl360ComposicionTable"),
     rl360ComposicionDonut: document.getElementById("rl360ComposicionDonut"),
     rl360Info: document.getElementById("rl360Info"),
+    rl360CargosDetail: document.getElementById("rl360CargosDetail"),
     rl360ConsNote: document.getElementById("rl360ConsNote"),
     rl360ConsAnualTable: document.getElementById("rl360ConsAnualTable"),
     rl360ConsYearSelector: document.getElementById("rl360ConsYearSelector"),
@@ -3786,7 +3793,8 @@
       '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">VALOR ACTUAL</div><div class="value">' + fmtMoney(d.total) + '</div><div class="foot">' + monthLabel(d.per) + (d.primasNuevas?' · +' + fmtMoney(d.primasNuevas) + ' primas este periodo':'') + '</div></div>' +
       '<div class="summary-card" style="--accent:' + (cambioMercado>=0?'var(--emerald)':'var(--red)') + '"><div class="label">CAMBIO NETO (MERCADO)</div><div class="value" style="color:' + (cambioMercado>=0?'var(--emerald)':'var(--red)') + '">' + (cambioMercado>=0?'+':'') + fmtMoney(cambioMercado) + '</div><div class="foot">' + (prevD?'vs ' + monthLabel(prevD.per):'') + ' — variación de precio de los fondos</div></div>' +
       '<div class="summary-card" style="--accent:var(--blue)"><div class="label">TOTAL PRIMAS INVERTIDAS</div><div class="value">' + fmtMoney(totalInvertido) + '</div><div class="foot">Acumulado a ' + monthLabel(d.per) + ' · ' + fmtMoney(r.primaMensual) + '/mes</div></div>' +
-      '<div class="summary-card" style="--accent:' + (gpInstrumento>=0?'var(--emerald)':'var(--red)') + '"><div class="label">GANANCIA / PÉRDIDA</div><div class="value" style="color:' + (gpInstrumento>=0?'var(--emerald)':'var(--red)') + '">' + (gpInstrumento>=0?'+':'') + fmtMoney(gpInstrumento) + '</div><div class="foot">' + (rendPct>=0?'+':'') + rendPct.toFixed(1) + '% vs primas invertidas</div></div>';
+      '<div class="summary-card" style="--accent:' + (gpInstrumento>=0?'var(--emerald)':'var(--red)') + '"><div class="label">GANANCIA / PÉRDIDA</div><div class="value" style="color:' + (gpInstrumento>=0?'var(--emerald)':'var(--red)') + '">' + (gpInstrumento>=0?'+':'') + fmtMoney(gpInstrumento) + '</div><div class="foot">' + (rendPct>=0?'+':'') + rendPct.toFixed(1) + '% vs primas invertidas</div></div>' +
+      '<div class="summary-card" style="--accent:var(--amber)"><div class="label">CARGOS DEL PERIODO</div><div class="value" style="color:var(--amber)">' + (d.cargos!=null?fmtMoney(d.cargos):'—') + '</div><div class="foot">' + (d.cargosLineas&&d.cargosLineas.length ? d.cargosLineas.length + ' cargo(s) — ' + monthLabel(d.per) : 'Sin datos para ' + monthLabel(d.per)) + '</div></div>';
 
     var fondoNombres = Object.keys(comp);
     var compHead = "<tr><th style='text-align:left'>Fondo</th><th>Base Anterior</th><th>G/Pérdida Mes</th><th>Valor Mercado</th><th>% Portafolio</th></tr>";
@@ -3823,22 +3831,34 @@
       '<div class="sr"><span class="lbl">Vencimiento</span><span class="val">' + fmtDate(r.vencimiento) + '</span></div>' +
       '<div class="sr"><span class="lbl">Plazo restante</span><span class="val">' + escapeHtml(r.plazoRestante||"") + '</span></div>';
 
+    if(els.rl360CargosDetail){
+      if(d.cargosLineas && d.cargosLineas.length){
+        var cargoRows = d.cargosLineas.map(function(l){
+          return "<div class='sr'><span class='lbl'>" + escapeHtml(l.descripcion||"Cargo") + "</span><span class='val' style='color:var(--red)'>−" + fmtMoney(Math.abs(l.monto||0)) + "</span></div>";
+        }).join("");
+        els.rl360CargosDetail.innerHTML = cargoRows + "<div class='sr' style='border-top:1px solid var(--border-soft);margin-top:6px;padding-top:8px;'><span class='lbl' style='font-weight:700;'>Total cargos — " + monthLabel(d.per) + "</span><span class='val' style='font-weight:700;color:var(--red)'>−" + fmtMoney(d.cargos||0) + "</span></div>";
+      } else {
+        els.rl360CargosDetail.innerHTML = "<div style='color:var(--text-dim);font-size:12.5px;'>Sin desglose de cargos para " + monthLabel(d.per) + ". Sube el estado de cuenta con el \"Extracto de Transacciones\" (o carga los montos manualmente en Configuración → Cargar Estado de Cuenta) para verlos aquí.</div>";
+      }
+    }
+
     renderRl360Consolidado(r, hist);
   }
 
   function renderRl360Consolidado(r, hist){
-    els.rl360ConsNote.textContent = "Total Invertido = primas pagadas acumuladas. Cambio Mercado = variación de precio de los fondos, sin contar las primas nuevas. Rendimiento = Ganancia/Pérdida ÷ Total Invertido.";
+    els.rl360ConsNote.textContent = "Total Invertido = primas pagadas acumuladas. Cambio Mercado = variación de precio de los fondos, sin contar las primas nuevas. Cargos = comisiones cobradas por la plataforma en el periodo (ya están descontadas del Valor de Mercado, se muestran aparte como referencia). Rendimiento = Ganancia/Pérdida ÷ Total Invertido.";
 
     var years = [];
     hist.forEach(function(h){ var y = h.per.slice(0,4); if(years.indexOf(y)===-1) years.push(y); });
     years.sort();
 
-    var aHead = "<tr><th style='text-align:left'>Año</th><th>Primas del Año</th><th>Total Invertido</th><th>Cambio Mercado</th><th>Valor de Mercado</th><th>G/P Acumulado</th><th>Rendimiento</th></tr>";
+    var aHead = "<tr><th style='text-align:left'>Año</th><th>Primas del Año</th><th>Total Invertido</th><th>Cambio Mercado</th><th>Cargos</th><th>Valor de Mercado</th><th>G/P Acumulado</th><th>Rendimiento</th></tr>";
     var aRows = years.map(function(y){
       var idxs = []; hist.forEach(function(h,i){ if(h.per.slice(0,4)===y) idxs.push(i); });
       var lastIdx = idxs[idxs.length-1];
       var primasAnio = idxs.reduce(function(s,i){ return s+(hist[i].primasNuevas||0); },0);
       var cambioAnio = idxs.reduce(function(s,i){ return s+rl360CambioMercado(hist,i); },0);
+      var cargosAnio = idxs.reduce(function(s,i){ return s+(hist[i].cargos||0); },0);
       var totalInv = rl360TotalInvertidoAsOf(r, hist, lastIdx);
       var valorMkt = hist[lastIdx].total||0;
       var gp = round2(valorMkt-totalInv);
@@ -3847,6 +3867,7 @@
         "<td>" + (primasAnio?fmtMoney(primasAnio):"—") + "</td>" +
         "<td style='font-weight:600;'>" + fmtMoney(totalInv) + "</td>" +
         "<td style='color:" + pctColor(cambioAnio) + "'>" + signMoney(round2(cambioAnio)) + "</td>" +
+        "<td style='color:var(--amber)'>" + (cargosAnio?"−"+fmtMoney(cargosAnio):"—") + "</td>" +
         "<td style='font-weight:700;'>" + fmtMoney(valorMkt) + "</td>" +
         "<td style='color:" + pctColor(gp) + "'>" + signMoney(gp) + "</td>" +
         "<td style='font-weight:700;color:" + pctColor(rend) + "'>" + fmtPct1(rend/100) + "</td></tr>";
@@ -3872,7 +3893,7 @@
 
     var idxsAnio = []; hist.forEach(function(h,i){ if(h.per.slice(0,4)===rl360ConsYear) idxsAnio.push(i); });
 
-    var mHead = "<tr><th style='text-align:left'>Período</th><th>Primas</th><th>Total Invertido</th><th>Cambio Mercado</th><th>Valor de Mercado</th><th>G/P Acumulado</th><th>Rendimiento</th></tr>";
+    var mHead = "<tr><th style='text-align:left'>Período</th><th>Primas</th><th>Total Invertido</th><th>Cambio Mercado</th><th>Cargos</th><th>Valor de Mercado</th><th>G/P Acumulado</th><th>Rendimiento</th></tr>";
     var mRowsSrc;
     if(rl360ConsVista === "mensual"){
       mRowsSrc = idxsAnio.map(function(i){ return { label: monthLabel(hist[i].per), idxs:[i] }; });
@@ -3890,6 +3911,7 @@
       var lastIdx = grp.idxs[grp.idxs.length-1];
       var primas = grp.idxs.reduce(function(s,i){ return s+(hist[i].primasNuevas||0); },0);
       var cambio = grp.idxs.reduce(function(s,i){ return s+rl360CambioMercado(hist,i); },0);
+      var cargosGrp = grp.idxs.reduce(function(s,i){ return s+(hist[i].cargos||0); },0);
       var totalInv = rl360TotalInvertidoAsOf(r, hist, lastIdx);
       var valorMkt = hist[lastIdx].total||0;
       var gp = round2(valorMkt-totalInv);
@@ -3898,6 +3920,7 @@
         "<td>" + (primas?fmtMoney(primas):"—") + "</td>" +
         "<td style='font-weight:600;'>" + fmtMoney(totalInv) + "</td>" +
         "<td style='color:" + pctColor(cambio) + "'>" + signMoney(round2(cambio)) + "</td>" +
+        "<td style='color:var(--amber)'>" + (cargosGrp?"−"+fmtMoney(cargosGrp):"—") + "</td>" +
         "<td style='font-weight:700;'>" + fmtMoney(valorMkt) + "</td>" +
         "<td style='color:" + pctColor(gp) + "'>" + signMoney(gp) + "</td>" +
         "<td style='color:" + pctColor(rend) + "'>" + fmtPct1(rend/100) + "</td></tr>";
@@ -4475,6 +4498,7 @@
   var pendingSwLocalData = null;
   var pendingRl360Composicion = null;
   var pendingRl360NumeroPoliza = null;
+  var pendingRl360CargosLineas = null;
 
   function prefillReviewForm(obj){
     if(!obj) return;
@@ -4497,6 +4521,12 @@
     else if(obj.primasNuevas != null) els.ivIngresos.value = obj.primasNuevas;
     pendingRl360Composicion = (obj.composicion && els.importTarget.value === "rl360") ? obj.composicion : null;
     pendingRl360NumeroPoliza = (obj.numeroPoliza && els.importTarget.value === "rl360") ? obj.numeroPoliza : null;
+    if(els.importTarget.value === "rl360" && obj.cargosLineas && obj.cargosLineas.length){
+      pendingRl360CargosLineas = obj.cargosLineas;
+      els.ivCargos.value = round2(obj.cargosLineas.reduce(function(s,l){ return s+(l.monto||0); }, 0));
+    } else if(els.importTarget.value === "rl360"){
+      pendingRl360CargosLineas = null;
+    }
     if(obj.composicion){
       if(obj.composicion.efectivo != null) els.ivEfectivo.value = obj.composicion.efectivo;
       if(obj.composicion.bonos != null) els.ivRentaFija.value = obj.composicion.bonos;
@@ -4524,7 +4554,8 @@
       }
     }
 
-    var hasCashDetail = (obj.ingresosLineas && obj.ingresosLineas.length) || (obj.cargosLineas && obj.cargosLineas.length) || (obj.otrasTransaccionesLineas && obj.otrasTransaccionesLineas.length) || (obj.impuestosRetenidosLineas && obj.impuestosRetenidosLineas.length) || obj.distribucionBlackRock != null || obj.otrasTransacciones != null || obj.impuestosRetenidos != null || obj.efectivoAperturaMes != null || obj.efectivoCierreMes != null || (obj.efectivoMovimientosLineas && obj.efectivoMovimientosLineas.length);
+    var esRl360Data = els.importTarget.value === "rl360";
+    var hasCashDetail = !esRl360Data && ((obj.ingresosLineas && obj.ingresosLineas.length) || (obj.cargosLineas && obj.cargosLineas.length) || (obj.otrasTransaccionesLineas && obj.otrasTransaccionesLineas.length) || (obj.impuestosRetenidosLineas && obj.impuestosRetenidosLineas.length) || obj.distribucionBlackRock != null || obj.otrasTransacciones != null || obj.impuestosRetenidos != null || obj.efectivoAperturaMes != null || obj.efectivoCierreMes != null || (obj.efectivoMovimientosLineas && obj.efectivoMovimientosLineas.length));
     pendingPershingCashDetail = hasCashDetail ? {
       ingresosLineas: obj.ingresosLineas || [],
       cargosLineas: obj.cargosLineas || [],
@@ -4538,7 +4569,20 @@
       efectivoCierre: obj.efectivoCierreMes,
       efectivoMovimientosLineas: obj.efectivoMovimientosLineas || []
     } : null;
-    if(els.ivPershingCashDetail){
+    if(esRl360Data){
+      if(els.ivPershingCashDetail){
+        if(pendingRl360CargosLineas && pendingRl360CargosLineas.length){
+          var linesRl = [];
+          pendingRl360CargosLineas.forEach(function(l){
+            if(l.monto) linesRl.push("<span style='color:var(--red)'>−" + fmtMoney(Math.abs(l.monto)) + "</span> " + escapeHtml(l.descripcion||"Cargo"));
+          });
+          var totalCargosRl = pendingRl360CargosLineas.reduce(function(s,l){ return s+(l.monto||0); }, 0);
+          els.ivPershingCashDetail.innerHTML = "<div style='color:var(--text-dim);font-size:11.5px;margin-bottom:4px;'>Cargos/comisiones detectados en el Extracto de Transacciones (revisa contra el PDF antes de aplicar):</div><div style='font-size:12.5px;line-height:1.9;'>" + linesRl.join("<br>") + "</div><div style='margin-top:6px;font-weight:700;'>Total cargos del periodo: " + fmtMoney(totalCargosRl) + "</div>";
+        } else {
+          els.ivPershingCashDetail.innerHTML = "<div style='color:var(--amber);font-size:12px;'>⚠ No se detectaron cargos/comisiones en el \"Extracto de Transacciones\" de este documento — si el estado de cuenta los incluye, revísalo manualmente.</div>";
+        }
+      }
+    } else if(els.ivPershingCashDetail){
       if(pendingPershingCashDetail){
         var lines = [];
         if(pendingPershingCashDetail.distribucionBlackRock != null){
@@ -4725,14 +4769,16 @@
             "- \"Premios Invertidos Actuales\" o \"Premios Invertidos (Capital)\": el CAPITAL ACUMULADO — total de TODAS las primas pagadas desde el inicio de la póliza hasta la fecha de este estado de cuenta (NO es la prima de este mes/periodo, es el acumulado histórico completo)\n" +
             "- \"Rendimiento Acumulado Neto\": informativo, es (Valor Actual − Premios Invertidos) ÷ Premios Invertidos — sirve para verificar que los otros dos números están bien leídos, no hace falta reportarlo aparte\n" +
             "- Tabla de \"Distribución de Activos\" / fondos individuales con su valor actual cada uno\n" +
+            "- \"Extracto de Transacciones\": lista los cargos/comisiones que la plataforma cobró en el periodo, con nombres como \"Administration Charge\" (cargo administrativo sobre el saldo), \"Establishment Charge\" (cargo de establecimiento, descuento progresivo de los primeros años de la póliza), \"Servicing Charge\" (cargo mensual de servicio de cuenta), \"Financial Adviser Fee\" (comisión del asesor financiero) — puede haber otros nombres de cargo, inclúyelos todos tal como aparezcan\n" +
             "\nExtrae:\n" +
             "1. periodo (formato YYYY-MM, el mes de corte del estado de cuenta)\n" +
             "2. numeroPoliza: el número de póliza tal como aparece (si no aparece, usa null)\n" +
             "3. total: \"Valor Actual de la Póliza\"\n" +
             "4. premiosInvertidos: \"Premios Invertidos Actuales\" / \"Premios Invertidos (Capital)\" — el ACUMULADO histórico completo, no la prima de un solo mes\n" +
             "5. composicion: objeto con CADA fondo individual del documento y su valor de mercado actual, ej: {\"BGF World Technology A2 Acc USD\":8393.60,\"Guinness Global Innovators C Acc USD\":10117.80}\n" +
+            "6. cargosLineas: arreglo con CADA cargo/comisión individual del \"Extracto de Transacciones\" en el periodo cubierto por este documento, con su descripción literal y monto, ej: [{\"descripcion\":\"Administration Charge\",\"monto\":45.20},{\"descripcion\":\"Establishment Charge\",\"monto\":38.50},{\"descripcion\":\"Servicing Charge\",\"monto\":5.00},{\"descripcion\":\"Financial Adviser Fee\",\"monto\":12.60}]. Si el documento cubre varios meses, suma cada tipo de cargo en un solo renglón por tipo. Si no encuentras esta sección, deja el arreglo vacío — NO inventes cargos ni cifras.\n" +
             "IMPORTANTE: usa el nombre EXACTO de cada fondo tal como aparece literalmente en el documento (debe coincidir mes a mes para poder comparar). No inventes fondos ni cifras — si un fondo no aparece este periodo, simplemente no lo incluyas. Verifica que total ≈ suma de composicion, y que premiosInvertidos + rendimiento ≈ total, antes de responder. Responde SOLO con JSON, sin texto adicional."
-          + "\n\nEjemplo de formato esperado:\n{\"periodo\":\"2026-08\",\"numeroPoliza\":\"RS02017296\",\"total\":34514.52,\"premiosInvertidos\":25200,\"composicion\":{\"Guinness Global Innovators C Acc USD\":10117.80,\"BGF World Technology A2 Acc USD\":8393.60,\"Janus Henderson US Forty A Acc USD\":8356.77,\"Janus Henderson Global Life Sciences\":7646.35}}"
+          + "\n\nEjemplo de formato esperado:\n{\"periodo\":\"2026-08\",\"numeroPoliza\":\"RS02017296\",\"total\":34514.52,\"premiosInvertidos\":25200,\"composicion\":{\"Guinness Global Innovators C Acc USD\":10117.80,\"BGF World Technology A2 Acc USD\":8393.60,\"Janus Henderson US Forty A Acc USD\":8356.77,\"Janus Henderson Global Life Sciences\":7646.35},\"cargosLineas\":[{\"descripcion\":\"Administration Charge\",\"monto\":45.20},{\"descripcion\":\"Establishment Charge\",\"monto\":38.50},{\"descripcion\":\"Servicing Charge\",\"monto\":5.00},{\"descripcion\":\"Financial Adviser Fee\",\"monto\":12.60}]}"
           : "Este es el texto extraído de un estado de cuenta financiero:\n\n" + pdfPreviewText + "\n\nExtrae: periodo (formato YYYY-MM), saldo/valor total del periodo, ingresos/cupones/réditos/canon del periodo, y cargos/comisiones del periodo. " +
             "Además, si el documento trae detalle línea por línea de transacciones (ej. \"Cupón X\", \"COMISION\", \"ITBMS\", \"INTERES ACUMULADO\", cargos de custodia/manejo, etc.), inclúyelo en ingresosLineas y cargosLineas como arreglos de {\"descripcion\":\"...\",\"monto\":0} — una línea por cada transacción individual del período, con su descripción literal (ej. \"Cupón ALUT0875000527W\", \"Comisión compra\", \"ITBMS 7%\"). Si no hay detalle línea por línea disponible, omite estos dos campos. " +
             "Responde SOLO con JSON: {\"periodo\":\"YYYY-MM\",\"total\":0,\"ingresos\":0,\"cargos\":0,\"ingresosLineas\":[{\"descripcion\":\"...\",\"monto\":0}],\"cargosLineas\":[{\"descripcion\":\"...\",\"monto\":0}]}";
@@ -5029,10 +5075,12 @@
         if(primasNuevasCalc!=null) existingR.primasNuevas = primasNuevasCalc;
         existingR.notas = notas;
         if(pendingRl360Composicion) existingR.composicion = pendingRl360Composicion;
+        if(pendingRl360CargosLineas){ existingR.cargos = cargos; existingR.cargosLineas = pendingRl360CargosLineas; }
       } else {
         var entryR = { per:per, total: valorTotal||0, primasNuevas: primasNuevasCalc, notas: notas };
         if(premiosAcum!=null) entryR.premiosInvertidos = premiosAcum;
         if(pendingRl360Composicion) entryR.composicion = pendingRl360Composicion;
+        if(pendingRl360CargosLineas){ entryR.cargos = cargos; entryR.cargosLineas = pendingRl360CargosLineas; }
         r.historial.push(entryR);
       }
       // r.primasInvertidas siempre refleja el premiosInvertidos del periodo cronológicamente MÁS RECIENTE
@@ -5043,6 +5091,7 @@
       if(pendingRl360NumeroPoliza) r.numeroPoliza = pendingRl360NumeroPoliza;
       pendingRl360Composicion = null;
       pendingRl360NumeroPoliza = null;
+      pendingRl360CargosLineas = null;
       var accR = findInv(t.investmentId);
       if(accR && valorTotal!=null) accR.value = valorTotal;
     }
