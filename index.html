@@ -589,20 +589,35 @@
       </div>
 
       <div class="page" id="page-rl360">
+        <div class="month-bar" id="rl360Months"></div>
         <div class="kpi-grid-3" id="rl360Kpis"></div>
         <div class="charts-row">
-          <div class="chart-card" style="grid-column:1 / span 1;">
-            <h3>Fondos — Dic 2025 vs Mar 2026</h3>
-            <p class="sub">&nbsp;</p>
-            <div class="matrix-wrap">
-              <table class="matrix" id="rl360FondosTable" style="font-size:12.5px;"></table>
-            </div>
+          <div class="chart-card">
+            <h3>Composición por Fondo</h3>
+            <p class="sub">Base Anterior + G/Pérdida del mes = Valor de Mercado actual</p>
+            <div class="matrix-wrap"><table class="matrix" id="rl360ComposicionTable" style="font-size:12.5px;"></table></div>
+            <div id="rl360ComposicionDonut" style="margin-top:16px;"></div>
           </div>
           <div class="chart-card">
             <h3>Info de la Póliza</h3>
             <p class="sub">&nbsp;</p>
             <div id="rl360Info"></div>
           </div>
+        </div>
+
+        <div class="table-card" style="padding:20px 22px;margin-top:16px;">
+          <h3 style="margin:0 0 4px;">📊 Análisis Consolidado — Comportamiento por Año</h3>
+          <p class="sub" style="margin:0 0 14px;" id="rl360ConsNote">&nbsp;</p>
+          <div class="matrix-wrap" style="margin-bottom:20px;"><table class="matrix" id="rl360ConsAnualTable" style="font-size:12.5px;"></table></div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+            <h3 style="margin:0;font-size:13px;">Detalle Periódico</h3>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <div class="month-bar" id="rl360ConsYearSelector" style="margin-bottom:0;"></div>
+              <div class="month-bar" id="rl360ConsVistaSelector" style="margin-bottom:0;"></div>
+            </div>
+          </div>
+          <div class="matrix-wrap"><table class="matrix" id="rl360ConsMesesTable" style="font-size:12px;"></table></div>
         </div>
       </div>
 
@@ -1304,8 +1319,15 @@
     swpBrYearTotal: document.getElementById("swpBrYearTotal"),
     swpHistorialList: document.getElementById("swpHistorialList"),
     rl360Kpis: document.getElementById("rl360Kpis"),
-    rl360FondosTable: document.getElementById("rl360FondosTable"),
+    rl360Months: document.getElementById("rl360Months"),
+    rl360ComposicionTable: document.getElementById("rl360ComposicionTable"),
+    rl360ComposicionDonut: document.getElementById("rl360ComposicionDonut"),
     rl360Info: document.getElementById("rl360Info"),
+    rl360ConsNote: document.getElementById("rl360ConsNote"),
+    rl360ConsAnualTable: document.getElementById("rl360ConsAnualTable"),
+    rl360ConsYearSelector: document.getElementById("rl360ConsYearSelector"),
+    rl360ConsVistaSelector: document.getElementById("rl360ConsVistaSelector"),
+    rl360ConsMesesTable: document.getElementById("rl360ConsMesesTable"),
     ftzKpis: document.getElementById("ftzKpis"),
     ftzAlerts: document.getElementById("ftzAlerts"),
     ftzActivasTable: document.getElementById("ftzActivasTable"),
@@ -2319,16 +2341,9 @@
       var s2 = periods.map(function(p){ return { label: monthLabel(p), value: backup.state.pershingHistorial[p].total }; });
       return { points:s2, label: acc.name, color:color, reconstructed:false };
     }
-    if(acc.id === "rl360" && backup.state.rl360){
+    if(acc.id === "rl360" && backup.state.rl360 && Array.isArray(backup.state.rl360.historial)){
       var r = backup.state.rl360;
-      var s3 = [];
-      if(Array.isArray(r.historial)){
-        s3 = r.historial.slice().sort(function(a,b){ return a.per<b.per?-1:1; }).map(function(h){ return { label: monthLabel(h.per), value: h.total }; });
-      }
-      if(r.totalPoliza){
-        s3.unshift({ label:"Dic 2025", value:r.totalPoliza.dic2025 });
-        s3.push({ label:"Mar 2026", value:r.totalPoliza.mar2026 });
-      }
+      var s3 = r.historial.slice().sort(function(a,b){ return a.per<b.per?-1:1; }).map(function(h){ return { per:h.per, label: monthLabel(h.per), value: h.total }; });
       return { points:s3, label: acc.name, color:color, reconstructed:false };
     }
     var recon = reconstructSeriesFromMovimientos(acc);
@@ -3721,33 +3736,170 @@
   }
 
   /* ---------- RL360 (pólizas y fondos) ---------- */
+  var rl360CurPer = null;
+  var rl360ConsYear = null;
+  var rl360ConsVista = "anual";
+  var RL360_PALETTE = ["#8b5cf6","#10b981","#3b82f6","#f59e0b","#ef4444","#f97316","#06b6d4","#ec4899","#a3e635","#94a3b8"];
+
+  // Total de primas pagadas ACUMULADO hasta un periodo cualquiera del historial. r.primasInvertidas es la
+  // cifra autoritativa "a la fecha de la ultima carga" — para periodos anteriores se resta lo aportado en
+  // los periodos posteriores del historial (no se inventa dato, solo se deriva del que ya se confirmo).
+  function rl360TotalInvertidoAsOf(r, hist, idx){
+    var sumDespues = 0;
+    for(var i=idx+1; i<hist.length; i++){ sumDespues += (hist[i].primasNuevas||0); }
+    return round2((r.primasInvertidas||0) - sumDespues);
+  }
+  function rl360CambioMercado(hist, idx){
+    var d = hist[idx], prevD = idx>0 ? hist[idx-1] : null;
+    return round2((d.total||0) - (prevD?(prevD.total||0):(d.total||0)) - (d.primasNuevas||0));
+  }
+
   function renderRl360(){
     var r = backup.state.rl360;
     if(!r) return;
-    var tp = r.totalPoliza || {};
-    var chg = tp.variacionMonto || 0;
+    var hist = (r.historial||[]).slice().sort(function(a,b){ return a.per<b.per?-1:1; });
+    if(!hist.length){ return; }
+    if(!rl360CurPer || hist.findIndex(function(h){return h.per===rl360CurPer;})===-1) rl360CurPer = hist[hist.length-1].per;
+
+    els.rl360Months.innerHTML = hist.map(function(h){
+      return '<button class="month-btn' + (h.per===rl360CurPer?' on':'') + '" data-per="' + h.per + '">' + monthLabel(h.per) + '</button>';
+    }).join("");
+    els.rl360Months.querySelectorAll(".month-btn").forEach(function(btn){
+      btn.addEventListener("click", function(){ rl360CurPer = btn.getAttribute("data-per"); renderRl360(); });
+    });
+
+    var idx = hist.findIndex(function(h){ return h.per===rl360CurPer; });
+    var d = hist[idx];
+    var prevD = idx>0 ? hist[idx-1] : null;
+    var comp = d.composicion || {};
+    var prevComp = (prevD && prevD.composicion) || {};
+
+    var cambioMercado = rl360CambioMercado(hist, idx);
+    var totalInvertido = rl360TotalInvertidoAsOf(r, hist, idx);
+    var gpInstrumento = round2((d.total||0) - totalInvertido);
+    var rendPct = totalInvertido ? (gpInstrumento/totalInvertido*100) : 0;
 
     els.rl360Kpis.innerHTML =
-      '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">VALOR ACTUAL</div><div class="value">' + fmtMoney(tp.mar2026) + '</div><div class="foot">Total póliza</div></div>' +
-      '<div class="summary-card" style="--accent:var(--red)"><div class="label">CAMBIO NETO</div><div class="value" style="color:' + (chg>=0?'var(--emerald)':'var(--red)') + '">' + (chg>=0?'+':'') + fmtMoney(chg) + '</div><div class="foot">' + tp.variacionPct + '% en el periodo</div></div>' +
-      '<div class="summary-card" style="--accent:var(--blue)"><div class="label">RENTABILIDAD VS PRIMAS</div><div class="value" style="color:var(--emerald)">+' + (r.rentabilidadVsPrimas||0).toFixed(2) + '%</div><div class="foot">Primas invertidas ' + fmtMoney(r.primasInvertidas) + '</div></div>';
+      '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">VALOR ACTUAL</div><div class="value">' + fmtMoney(d.total) + '</div><div class="foot">' + monthLabel(d.per) + (d.primasNuevas?' · +' + fmtMoney(d.primasNuevas) + ' primas este periodo':'') + '</div></div>' +
+      '<div class="summary-card" style="--accent:' + (cambioMercado>=0?'var(--emerald)':'var(--red)') + '"><div class="label">CAMBIO NETO (MERCADO)</div><div class="value" style="color:' + (cambioMercado>=0?'var(--emerald)':'var(--red)') + '">' + (cambioMercado>=0?'+':'') + fmtMoney(cambioMercado) + '</div><div class="foot">' + (prevD?'vs ' + monthLabel(prevD.per):'') + ' — variación de precio de los fondos</div></div>' +
+      '<div class="summary-card" style="--accent:var(--blue)"><div class="label">TOTAL PRIMAS INVERTIDAS</div><div class="value">' + fmtMoney(totalInvertido) + '</div><div class="foot">Acumulado a ' + monthLabel(d.per) + ' · ' + fmtMoney(r.primaMensual) + '/mes</div></div>' +
+      '<div class="summary-card" style="--accent:' + (gpInstrumento>=0?'var(--emerald)':'var(--red)') + '"><div class="label">GANANCIA / PÉRDIDA</div><div class="value" style="color:' + (gpInstrumento>=0?'var(--emerald)':'var(--red)') + '">' + (gpInstrumento>=0?'+':'') + fmtMoney(gpInstrumento) + '</div><div class="foot">' + (rendPct>=0?'+':'') + rendPct.toFixed(1) + '% vs primas invertidas</div></div>';
 
-    var head = "<tr><th style='text-align:left'>Fondo</th><th>Dic 2025</th><th>Mar 2026</th><th>Variación</th></tr>";
-    var rows = (r.fondos||[]).map(function(f){
-      var neg = f.variacionMonto < 0;
-      return "<tr><td>" + escapeHtml(f.nombre) + "</td><td>" + fmtMoney(f.dic2025) + "</td><td>" + fmtMoney(f.mar2026) + "</td>" +
-        "<td style='color:" + (neg?"var(--red)":"var(--emerald)") + "'>" + (neg?"":"+") + fmtMoney(f.variacionMonto) + " (" + f.variacionPct + "%)</td></tr>";
+    var fondoNombres = Object.keys(comp);
+    var compHead = "<tr><th style='text-align:left'>Fondo</th><th>Base Anterior</th><th>G/Pérdida Mes</th><th>Valor Mercado</th><th>% Portafolio</th></tr>";
+    var sumBase=0, sumGp=0, sumVal=0;
+    var compRows = fondoNombres.map(function(nombre, i){
+      var valorActual = comp[nombre]||0;
+      var baseAnterior = prevComp[nombre]!=null ? prevComp[nombre] : valorActual;
+      var gpMes = round2(valorActual-baseAnterior);
+      var pct = d.total ? valorActual/d.total*100 : 0;
+      sumBase+=baseAnterior; sumGp+=gpMes; sumVal+=valorActual;
+      var color = RL360_PALETTE[i % RL360_PALETTE.length];
+      return "<tr><td style='text-align:left;font-weight:700;color:var(--text)'><span style='display:inline-block;width:9px;height:9px;border-radius:2px;background:" + color + ";margin-right:6px;'></span>" + escapeHtml(nombre) + "</td>" +
+        "<td>" + fmtMoney(baseAnterior) + "</td>" +
+        "<td style='color:" + pctColor(gpMes) + "'>" + signMoney(gpMes) + "</td>" +
+        "<td style='font-weight:700;'>" + fmtMoney(valorActual) + "</td>" +
+        "<td>" + pct.toFixed(1) + "%</td></tr>";
     }).join("");
-    var total = "<tr class='matrix-total'><td>TOTAL PÓLIZA</td><td>" + fmtMoney(tp.dic2025) + "</td><td>" + fmtMoney(tp.mar2026) + "</td>" +
-      "<td style='color:" + (chg<0?"var(--red)":"var(--emerald)") + "'>" + (chg<0?"":"+") + fmtMoney(chg) + " (" + tp.variacionPct + "%)</td></tr>";
-    els.rl360FondosTable.innerHTML = head + rows + total;
+    sumBase=round2(sumBase); sumGp=round2(sumGp); sumVal=round2(sumVal);
+    var compTotalRow = "<tr class='matrix-total'><td>TOTAL PÓLIZA</td><td>" + fmtMoney(sumBase) + "</td>" +
+      "<td style='color:" + pctColor(sumGp) + "'>" + signMoney(sumGp) + "</td>" +
+      "<td style='color:var(--emerald)'>" + fmtMoney(sumVal) + "</td><td>100.0%</td></tr>";
+    els.rl360ComposicionTable.innerHTML = compHead + compRows + compTotalRow;
+    makeSortable(els.rl360ComposicionTable);
+
+    els.rl360ComposicionDonut.innerHTML = buildSimpleDonut(fondoNombres.map(function(nombre, i){
+      return { label: nombre, value: comp[nombre]||0, color: RL360_PALETTE[i % RL360_PALETTE.length] };
+    }));
 
     els.rl360Info.innerHTML =
-      '<div class="sr"><span class="lbl">Primas invertidas</span><span class="val">' + fmtMoney(r.primasInvertidas) + '</span></div>' +
+      '<div class="sr"><span class="lbl">Primas invertidas (acumulado)</span><span class="val">' + fmtMoney(r.primasInvertidas) + '</span></div>' +
       '<div class="sr"><span class="lbl">Prima mensual</span><span class="val">' + fmtMoney(r.primaMensual) + '</span></div>' +
       '<div class="sr"><span class="lbl">Fecha inicio</span><span class="val">' + fmtDate(r.fechaInicio) + '</span></div>' +
       '<div class="sr"><span class="lbl">Vencimiento</span><span class="val">' + fmtDate(r.vencimiento) + '</span></div>' +
       '<div class="sr"><span class="lbl">Plazo restante</span><span class="val">' + escapeHtml(r.plazoRestante||"") + '</span></div>';
+
+    renderRl360Consolidado(r, hist);
+  }
+
+  function renderRl360Consolidado(r, hist){
+    els.rl360ConsNote.textContent = "Total Invertido = primas pagadas acumuladas. Cambio Mercado = variación de precio de los fondos, sin contar las primas nuevas. Rendimiento = Ganancia/Pérdida ÷ Total Invertido.";
+
+    var years = [];
+    hist.forEach(function(h){ var y = h.per.slice(0,4); if(years.indexOf(y)===-1) years.push(y); });
+    years.sort();
+
+    var aHead = "<tr><th style='text-align:left'>Año</th><th>Primas del Año</th><th>Total Invertido</th><th>Cambio Mercado</th><th>Valor de Mercado</th><th>G/P Acumulado</th><th>Rendimiento</th></tr>";
+    var aRows = years.map(function(y){
+      var idxs = []; hist.forEach(function(h,i){ if(h.per.slice(0,4)===y) idxs.push(i); });
+      var lastIdx = idxs[idxs.length-1];
+      var primasAnio = idxs.reduce(function(s,i){ return s+(hist[i].primasNuevas||0); },0);
+      var cambioAnio = idxs.reduce(function(s,i){ return s+rl360CambioMercado(hist,i); },0);
+      var totalInv = rl360TotalInvertidoAsOf(r, hist, lastIdx);
+      var valorMkt = hist[lastIdx].total||0;
+      var gp = round2(valorMkt-totalInv);
+      var rend = totalInv ? gp/totalInv*100 : 0;
+      return "<tr><td style='text-align:left;font-weight:700;color:var(--text)'>" + escapeHtml(y) + "</td>" +
+        "<td>" + (primasAnio?fmtMoney(primasAnio):"—") + "</td>" +
+        "<td style='font-weight:600;'>" + fmtMoney(totalInv) + "</td>" +
+        "<td style='color:" + pctColor(cambioAnio) + "'>" + signMoney(round2(cambioAnio)) + "</td>" +
+        "<td style='font-weight:700;'>" + fmtMoney(valorMkt) + "</td>" +
+        "<td style='color:" + pctColor(gp) + "'>" + signMoney(gp) + "</td>" +
+        "<td style='font-weight:700;color:" + pctColor(rend) + "'>" + fmtPct1(rend/100) + "</td></tr>";
+    }).join("");
+    els.rl360ConsAnualTable.innerHTML = aHead + aRows;
+    makeSortable(els.rl360ConsAnualTable);
+
+    if(!rl360ConsYear || years.indexOf(rl360ConsYear)===-1) rl360ConsYear = years[years.length-1];
+    els.rl360ConsYearSelector.innerHTML = years.slice().reverse().map(function(y){
+      return '<button class="month-btn' + (y===rl360ConsYear?' on':'') + '" data-year="' + y + '">' + y + '</button>';
+    }).join("");
+    els.rl360ConsYearSelector.querySelectorAll(".month-btn").forEach(function(btn){
+      btn.addEventListener("click", function(){ rl360ConsYear = btn.getAttribute("data-year"); renderRl360Consolidado(r, hist); });
+    });
+
+    var VISTAS = [["mensual","Mensual"],["trimestral","Trimestral"]];
+    els.rl360ConsVistaSelector.innerHTML = VISTAS.map(function(v){
+      return '<button class="month-btn' + (rl360ConsVista===v[0]?' on':'') + '" data-vista="' + v[0] + '">' + v[1] + '</button>';
+    }).join("");
+    els.rl360ConsVistaSelector.querySelectorAll(".month-btn").forEach(function(btn){
+      btn.addEventListener("click", function(){ rl360ConsVista = btn.getAttribute("data-vista"); renderRl360Consolidado(r, hist); });
+    });
+
+    var idxsAnio = []; hist.forEach(function(h,i){ if(h.per.slice(0,4)===rl360ConsYear) idxsAnio.push(i); });
+
+    var mHead = "<tr><th style='text-align:left'>Período</th><th>Primas</th><th>Total Invertido</th><th>Cambio Mercado</th><th>Valor de Mercado</th><th>G/P Acumulado</th><th>Rendimiento</th></tr>";
+    var mRowsSrc;
+    if(rl360ConsVista === "mensual"){
+      mRowsSrc = idxsAnio.map(function(i){ return { label: monthLabel(hist[i].per), idxs:[i] }; });
+    } else {
+      var byQ = {};
+      idxsAnio.forEach(function(i){
+        var mm = parseInt(hist[i].per.slice(5,7),10);
+        var q = Math.ceil(mm/3);
+        if(!byQ[q]) byQ[q] = [];
+        byQ[q].push(i);
+      });
+      mRowsSrc = Object.keys(byQ).sort().map(function(q){ return { label:"T" + q + " " + rl360ConsYear, idxs: byQ[q] }; });
+    }
+    var mRows = mRowsSrc.map(function(grp){
+      var lastIdx = grp.idxs[grp.idxs.length-1];
+      var primas = grp.idxs.reduce(function(s,i){ return s+(hist[i].primasNuevas||0); },0);
+      var cambio = grp.idxs.reduce(function(s,i){ return s+rl360CambioMercado(hist,i); },0);
+      var totalInv = rl360TotalInvertidoAsOf(r, hist, lastIdx);
+      var valorMkt = hist[lastIdx].total||0;
+      var gp = round2(valorMkt-totalInv);
+      var rend = totalInv ? gp/totalInv*100 : 0;
+      return "<tr><td style='text-align:left;font-weight:700;color:var(--text)'>" + escapeHtml(grp.label) + "</td>" +
+        "<td>" + (primas?fmtMoney(primas):"—") + "</td>" +
+        "<td style='font-weight:600;'>" + fmtMoney(totalInv) + "</td>" +
+        "<td style='color:" + pctColor(cambio) + "'>" + signMoney(round2(cambio)) + "</td>" +
+        "<td style='font-weight:700;'>" + fmtMoney(valorMkt) + "</td>" +
+        "<td style='color:" + pctColor(gp) + "'>" + signMoney(gp) + "</td>" +
+        "<td style='color:" + pctColor(rend) + "'>" + fmtPct1(rend/100) + "</td></tr>";
+    }).join("");
+    els.rl360ConsMesesTable.innerHTML = mHead + (mRows || "<tr><td colspan='7' style='color:var(--text-dim)'>Sin datos cargados para " + escapeHtml(rl360ConsYear) + "</td></tr>");
+    makeSortable(els.rl360ConsMesesTable);
   }
 
   /* ---------- Fortesza (factoring de facturas) ---------- */
@@ -4317,6 +4469,7 @@
   var pendingPershingPositions = null;
   var pendingPershingCashDetail = null;
   var pendingSwLocalData = null;
+  var pendingRl360Composicion = null;
 
   function prefillReviewForm(obj){
     if(!obj) return;
@@ -4330,6 +4483,11 @@
     }
     if(obj.cargos != null) els.ivCargos.value = obj.cargos;
     if(obj.depositos != null && els.ivPershingDepositos) els.ivPershingDepositos.value = obj.depositos;
+    // RL360: "primasNuevas" del prompt llena el mismo campo de "Ingresos" del formulario (MODULE_TARGETS lo
+    // etiqueta "Primas nuevas aportadas"), y la composición por fondo (claves dinámicas, un nombre por fondo)
+    // se guarda aparte para no chocar con el objeto composicion de clases de activo de SW Pershing/SW Local.
+    if(obj.primasNuevas != null) els.ivIngresos.value = obj.primasNuevas;
+    pendingRl360Composicion = (obj.composicion && els.importTarget.value === "rl360") ? obj.composicion : null;
     if(obj.composicion){
       if(obj.composicion.efectivo != null) els.ivEfectivo.value = obj.composicion.efectivo;
       if(obj.composicion.bonos != null) els.ivRentaFija.value = obj.composicion.bonos;
@@ -4499,6 +4657,7 @@
         els.importStatus.textContent = "Interpretando " + file.name + " con IA…";
         var isPershing = els.importTarget.value === "sw-pershing";
         var isSwLocal = els.importTarget.value === "sw-local";
+        var isRl360 = els.importTarget.value === "rl360";
         var promptText = isPershing
           ? "Este es el texto extraído de un estado de cuenta de Pershing/SweetWater (multi-activo: fondos mutuos, bonos corporativos, ETFs, y una posición BlackRock Private Credit Fund):\n\n" + pdfPreviewText +
             "\n\nEl documento típicamente tiene estas secciones — úsalas como guía para ubicar cada dato:\n" +
@@ -4549,6 +4708,15 @@
             "7. cargosLineas: [{\"descripcion\":\"...\",\"monto\":0,\"tipo\":\"fee_trimestral|itbms_fee_trimestral|comision_custodia_trimestral|itbms_custodia_trimestral|otro\"}] — SOLO cargos recurrentes de cuenta, NO ligados a una compra específica (esos van dentro de comprasNuevas)\n" +
             "IMPORTANTE: si alguna sección no aparece, omítela o déjala vacía — NO inventes cupones, compras, vencimientos ni cargos que no estén literalmente en el texto. Responde SOLO con el JSON, sin texto adicional."
           + "\n\nEjemplo de formato esperado:\n{\"periodo\":\"2026-03\",\"total\":229292.58,\"efectivo\":1442.58,\"cuponesRecibidos\":[{\"codigo\":\"ALUT0875000527W\",\"monto\":612.50}],\"comprasNuevas\":[{\"codigo\":\"ALUT0900000727J\",\"nombre\":\"Alutech S.A. 9%\",\"valorNominal\":20000,\"tasa\":\"9.00%\",\"vencimiento\":\"28/07/2027\",\"fechaCompra\":\"13/03/2026\",\"precioCompra\":100,\"comision\":40.00,\"itbms\":2.80,\"interesAcumulado\":230.00}],\"vencimientos\":[{\"codigo\":\"MIFI0900001026N\",\"monto\":52000}],\"cargosLineas\":[{\"descripcion\":\"Fee Trimestral\",\"monto\":390.00,\"tipo\":\"fee_trimestral\"},{\"descripcion\":\"ITBMS 7%\",\"monto\":27.30,\"tipo\":\"itbms_fee_trimestral\"}]}"
+          : isRl360
+          ? "Este es el texto extraído de un estado de cuenta de una póliza RL360 (seguro de inversión con varios fondos subyacentes):\n\n" + pdfPreviewText +
+            "\n\nExtrae:\n" +
+            "1. periodo (formato YYYY-MM, el mes de corte del estado de cuenta)\n" +
+            "2. total: valor total de la póliza al final del periodo (suma de todos los fondos)\n" +
+            "3. primasNuevas: primas/aportes nuevos pagados en el periodo cubierto por este documento (si cubre varios meses, usa el total pagado en ese rango; si no hay primas nuevas, usa 0)\n" +
+            "4. composicion: objeto con CADA fondo individual del documento y su valor de mercado actual, ej: {\"BGF World Technology A2 Acc USD\":5938.09,\"Guinness Global Innovators C Acc USD\":8158.15}\n" +
+            "IMPORTANTE: usa el nombre EXACTO de cada fondo tal como aparece literalmente en el documento (debe coincidir mes a mes para poder comparar). No inventes fondos ni cifras — si un fondo no aparece este periodo, simplemente no lo incluyas. Responde SOLO con JSON, sin texto adicional."
+          + "\n\nEjemplo de formato esperado:\n{\"periodo\":\"2026-03\",\"total\":26712.78,\"primasNuevas\":1260,\"composicion\":{\"BGF World Technology A2 Acc USD\":5938.09,\"Guinness Global Innovators C Acc USD\":8158.15,\"Janus Henderson Global Life Sciences Hgd\":6181.34,\"Janus Henderson US Forty A Acc USD\":6435.20}}"
           : "Este es el texto extraído de un estado de cuenta financiero:\n\n" + pdfPreviewText + "\n\nExtrae: periodo (formato YYYY-MM), saldo/valor total del periodo, ingresos/cupones/réditos/canon del periodo, y cargos/comisiones del periodo. " +
             "Además, si el documento trae detalle línea por línea de transacciones (ej. \"Cupón X\", \"COMISION\", \"ITBMS\", \"INTERES ACUMULADO\", cargos de custodia/manejo, etc.), inclúyelo en ingresosLineas y cargosLineas como arreglos de {\"descripcion\":\"...\",\"monto\":0} — una línea por cada transacción individual del período, con su descripción literal (ej. \"Cupón ALUT0875000527W\", \"Comisión compra\", \"ITBMS 7%\"). Si no hay detalle línea por línea disponible, omite estos dos campos. " +
             "Responde SOLO con JSON: {\"periodo\":\"YYYY-MM\",\"total\":0,\"ingresos\":0,\"cargos\":0,\"ingresosLineas\":[{\"descripcion\":\"...\",\"monto\":0}],\"cargosLineas\":[{\"descripcion\":\"...\",\"monto\":0}]}";
@@ -4830,8 +4998,24 @@
       var r = backup.state.rl360 || (backup.state.rl360 = {});
       if(!Array.isArray(r.historial)) r.historial = [];
       var existingR = r.historial.find(function(h){ return h.per === per; });
-      if(existingR){ existingR.total = valorTotal!=null?valorTotal:existingR.total; existingR.primasNuevas = ingresos; existingR.notas = notas; }
-      else r.historial.push({ per:per, total: valorTotal||0, primasNuevas: ingresos, notas: notas });
+      var primasNuevasVal = ingresos || 0;
+      // r.primasInvertidas es el acumulado TOTAL de primas pagadas (incluye años antes de que existiera
+      // historial mensual) — al cargar un periodo nuevo se suma; al corregir uno existente, se ajusta solo
+      // por la diferencia, para no contar dos veces la misma prima.
+      if(existingR){
+        var deltaPrimas = primasNuevasVal - (existingR.primasNuevas||0);
+        r.primasInvertidas = round2((r.primasInvertidas||0) + deltaPrimas);
+        existingR.total = valorTotal!=null?valorTotal:existingR.total;
+        existingR.primasNuevas = primasNuevasVal;
+        existingR.notas = notas;
+        if(pendingRl360Composicion) existingR.composicion = pendingRl360Composicion;
+      } else {
+        r.primasInvertidas = round2((r.primasInvertidas||0) + primasNuevasVal);
+        var entryR = { per:per, total: valorTotal||0, primasNuevas: primasNuevasVal, notas: notas };
+        if(pendingRl360Composicion) entryR.composicion = pendingRl360Composicion;
+        r.historial.push(entryR);
+      }
+      pendingRl360Composicion = null;
       var accR = findInv(t.investmentId);
       if(accR && valorTotal!=null) accR.value = valorTotal;
     }
