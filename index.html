@@ -3745,6 +3745,9 @@
   // cifra autoritativa "a la fecha de la ultima carga" — para periodos anteriores se resta lo aportado en
   // los periodos posteriores del historial (no se inventa dato, solo se deriva del que ya se confirmo).
   function rl360TotalInvertidoAsOf(r, hist, idx){
+    // Preferir el "premiosInvertidos" propio de ese periodo (dato autoritativo reportado por el estado de
+    // cuenta). Solo para periodos antiguos migrados sin ese dato se deriva restando lo aportado después.
+    if(hist[idx].premiosInvertidos != null) return hist[idx].premiosInvertidos;
     var sumDespues = 0;
     for(var i=idx+1; i<hist.length; i++){ sumDespues += (hist[i].primasNuevas||0); }
     return round2((r.primasInvertidas||0) - sumDespues);
@@ -3813,6 +3816,7 @@
     }));
 
     els.rl360Info.innerHTML =
+      (r.numeroPoliza ? '<div class="sr"><span class="lbl">Número de póliza</span><span class="val">' + escapeHtml(r.numeroPoliza) + '</span></div>' : '') +
       '<div class="sr"><span class="lbl">Primas invertidas (acumulado)</span><span class="val">' + fmtMoney(r.primasInvertidas) + '</span></div>' +
       '<div class="sr"><span class="lbl">Prima mensual</span><span class="val">' + fmtMoney(r.primaMensual) + '</span></div>' +
       '<div class="sr"><span class="lbl">Fecha inicio</span><span class="val">' + fmtDate(r.fechaInicio) + '</span></div>' +
@@ -4327,7 +4331,7 @@
     "sw-pershing":{ label:"Sweetwater Pershing (multi-activo)",     kind:"pershing",  investmentId:"pershing",
                     valorLabel:"Valor total del período", ingLabel:"Ingresos brutos",      carLabel:"Cargos" },
     "rl360":      { label:"RL360 (pólizas)",                       kind:"rl360",     investmentId:"rl360",
-                    valorLabel:"Valor total actual",  ingLabel:"Primas nuevas aportadas", carLabel:"Cargos" },
+                    valorLabel:"Valor Actual de la Póliza",  ingLabel:"Premios Invertidos Acumulados (Capital)", carLabel:"Cargos" },
     "fortesza":   { label:"Fortesza (factoring)",                  kind:"fortesza",  investmentId:"fortesa",
                     valorLabel:"Capital invertido activo", ingLabel:"Ganancias nuevas cobradas", carLabel:"Cargos" },
     "unfcu":      { label:"UNFCU",                                 kind:"generic",   investmentId:"unfcu",
@@ -4470,6 +4474,7 @@
   var pendingPershingCashDetail = null;
   var pendingSwLocalData = null;
   var pendingRl360Composicion = null;
+  var pendingRl360NumeroPoliza = null;
 
   function prefillReviewForm(obj){
     if(!obj) return;
@@ -4483,11 +4488,15 @@
     }
     if(obj.cargos != null) els.ivCargos.value = obj.cargos;
     if(obj.depositos != null && els.ivPershingDepositos) els.ivPershingDepositos.value = obj.depositos;
-    // RL360: "primasNuevas" del prompt llena el mismo campo de "Ingresos" del formulario (MODULE_TARGETS lo
-    // etiqueta "Primas nuevas aportadas"), y la composición por fondo (claves dinámicas, un nombre por fondo)
-    // se guarda aparte para no chocar con el objeto composicion de clases de activo de SW Pershing/SW Local.
-    if(obj.primasNuevas != null) els.ivIngresos.value = obj.primasNuevas;
+    // RL360: el campo "Ingresos" del formulario (MODULE_TARGETS lo etiqueta "Premios Invertidos Acumulados")
+    // se llena con "premiosInvertidos" — el CAPITAL ACUMULADO que el propio estado de cuenta reporta (más
+    // confiable que ir sumando primas mes a mes, porque el documento ya trae el acumulado correcto). La
+    // composición por fondo (claves dinámicas, un nombre por fondo) se guarda aparte para no chocar con el
+    // objeto composicion de clases de activo de SW Pershing/SW Local.
+    if(obj.premiosInvertidos != null) els.ivIngresos.value = obj.premiosInvertidos;
+    else if(obj.primasNuevas != null) els.ivIngresos.value = obj.primasNuevas;
     pendingRl360Composicion = (obj.composicion && els.importTarget.value === "rl360") ? obj.composicion : null;
+    pendingRl360NumeroPoliza = (obj.numeroPoliza && els.importTarget.value === "rl360") ? obj.numeroPoliza : null;
     if(obj.composicion){
       if(obj.composicion.efectivo != null) els.ivEfectivo.value = obj.composicion.efectivo;
       if(obj.composicion.bonos != null) els.ivRentaFija.value = obj.composicion.bonos;
@@ -4710,13 +4719,20 @@
           + "\n\nEjemplo de formato esperado:\n{\"periodo\":\"2026-03\",\"total\":229292.58,\"efectivo\":1442.58,\"cuponesRecibidos\":[{\"codigo\":\"ALUT0875000527W\",\"monto\":612.50}],\"comprasNuevas\":[{\"codigo\":\"ALUT0900000727J\",\"nombre\":\"Alutech S.A. 9%\",\"valorNominal\":20000,\"tasa\":\"9.00%\",\"vencimiento\":\"28/07/2027\",\"fechaCompra\":\"13/03/2026\",\"precioCompra\":100,\"comision\":40.00,\"itbms\":2.80,\"interesAcumulado\":230.00}],\"vencimientos\":[{\"codigo\":\"MIFI0900001026N\",\"monto\":52000}],\"cargosLineas\":[{\"descripcion\":\"Fee Trimestral\",\"monto\":390.00,\"tipo\":\"fee_trimestral\"},{\"descripcion\":\"ITBMS 7%\",\"monto\":27.30,\"tipo\":\"itbms_fee_trimestral\"}]}"
           : isRl360
           ? "Este es el texto extraído de un estado de cuenta de una póliza RL360 (seguro de inversión con varios fondos subyacentes):\n\n" + pdfPreviewText +
-            "\n\nExtrae:\n" +
+            "\n\nEl documento usa estos términos exactos — úsalos como guía para ubicar cada dato:\n" +
+            "- \"Número de Póliza\" (ej. RS02017296)\n" +
+            "- \"Valor Actual de la Póliza\": el valor total de mercado de la póliza al corte (suma de todos los fondos)\n" +
+            "- \"Premios Invertidos Actuales\" o \"Premios Invertidos (Capital)\": el CAPITAL ACUMULADO — total de TODAS las primas pagadas desde el inicio de la póliza hasta la fecha de este estado de cuenta (NO es la prima de este mes/periodo, es el acumulado histórico completo)\n" +
+            "- \"Rendimiento Acumulado Neto\": informativo, es (Valor Actual − Premios Invertidos) ÷ Premios Invertidos — sirve para verificar que los otros dos números están bien leídos, no hace falta reportarlo aparte\n" +
+            "- Tabla de \"Distribución de Activos\" / fondos individuales con su valor actual cada uno\n" +
+            "\nExtrae:\n" +
             "1. periodo (formato YYYY-MM, el mes de corte del estado de cuenta)\n" +
-            "2. total: valor total de la póliza al final del periodo (suma de todos los fondos)\n" +
-            "3. primasNuevas: primas/aportes nuevos pagados en el periodo cubierto por este documento (si cubre varios meses, usa el total pagado en ese rango; si no hay primas nuevas, usa 0)\n" +
-            "4. composicion: objeto con CADA fondo individual del documento y su valor de mercado actual, ej: {\"BGF World Technology A2 Acc USD\":5938.09,\"Guinness Global Innovators C Acc USD\":8158.15}\n" +
-            "IMPORTANTE: usa el nombre EXACTO de cada fondo tal como aparece literalmente en el documento (debe coincidir mes a mes para poder comparar). No inventes fondos ni cifras — si un fondo no aparece este periodo, simplemente no lo incluyas. Responde SOLO con JSON, sin texto adicional."
-          + "\n\nEjemplo de formato esperado:\n{\"periodo\":\"2026-03\",\"total\":26712.78,\"primasNuevas\":1260,\"composicion\":{\"BGF World Technology A2 Acc USD\":5938.09,\"Guinness Global Innovators C Acc USD\":8158.15,\"Janus Henderson Global Life Sciences Hgd\":6181.34,\"Janus Henderson US Forty A Acc USD\":6435.20}}"
+            "2. numeroPoliza: el número de póliza tal como aparece (si no aparece, usa null)\n" +
+            "3. total: \"Valor Actual de la Póliza\"\n" +
+            "4. premiosInvertidos: \"Premios Invertidos Actuales\" / \"Premios Invertidos (Capital)\" — el ACUMULADO histórico completo, no la prima de un solo mes\n" +
+            "5. composicion: objeto con CADA fondo individual del documento y su valor de mercado actual, ej: {\"BGF World Technology A2 Acc USD\":8393.60,\"Guinness Global Innovators C Acc USD\":10117.80}\n" +
+            "IMPORTANTE: usa el nombre EXACTO de cada fondo tal como aparece literalmente en el documento (debe coincidir mes a mes para poder comparar). No inventes fondos ni cifras — si un fondo no aparece este periodo, simplemente no lo incluyas. Verifica que total ≈ suma de composicion, y que premiosInvertidos + rendimiento ≈ total, antes de responder. Responde SOLO con JSON, sin texto adicional."
+          + "\n\nEjemplo de formato esperado:\n{\"periodo\":\"2026-08\",\"numeroPoliza\":\"RS02017296\",\"total\":34514.52,\"premiosInvertidos\":25200,\"composicion\":{\"Guinness Global Innovators C Acc USD\":10117.80,\"BGF World Technology A2 Acc USD\":8393.60,\"Janus Henderson US Forty A Acc USD\":8356.77,\"Janus Henderson Global Life Sciences\":7646.35}}"
           : "Este es el texto extraído de un estado de cuenta financiero:\n\n" + pdfPreviewText + "\n\nExtrae: periodo (formato YYYY-MM), saldo/valor total del periodo, ingresos/cupones/réditos/canon del periodo, y cargos/comisiones del periodo. " +
             "Además, si el documento trae detalle línea por línea de transacciones (ej. \"Cupón X\", \"COMISION\", \"ITBMS\", \"INTERES ACUMULADO\", cargos de custodia/manejo, etc.), inclúyelo en ingresosLineas y cargosLineas como arreglos de {\"descripcion\":\"...\",\"monto\":0} — una línea por cada transacción individual del período, con su descripción literal (ej. \"Cupón ALUT0875000527W\", \"Comisión compra\", \"ITBMS 7%\"). Si no hay detalle línea por línea disponible, omite estos dos campos. " +
             "Responde SOLO con JSON: {\"periodo\":\"YYYY-MM\",\"total\":0,\"ingresos\":0,\"cargos\":0,\"ingresosLineas\":[{\"descripcion\":\"...\",\"monto\":0}],\"cargosLineas\":[{\"descripcion\":\"...\",\"monto\":0}]}";
@@ -4998,24 +5014,35 @@
       var r = backup.state.rl360 || (backup.state.rl360 = {});
       if(!Array.isArray(r.historial)) r.historial = [];
       var existingR = r.historial.find(function(h){ return h.per === per; });
-      var primasNuevasVal = ingresos || 0;
-      // r.primasInvertidas es el acumulado TOTAL de primas pagadas (incluye años antes de que existiera
-      // historial mensual) — al cargar un periodo nuevo se suma; al corregir uno existente, se ajusta solo
-      // por la diferencia, para no contar dos veces la misma prima.
+      // El campo "Ingresos" del formulario para RL360 es "Premios Invertidos Acumulados" — el CAPITAL
+      // acumulado que el propio estado de cuenta reporta (autoritativo), no una prima suelta del mes.
+      // primasNuevas (informativo, para mostrar cuánto se aportó ESE periodo) se deriva comparando contra
+      // el premiosInvertidos del periodo cronológicamente anterior ya cargado.
+      var premiosAcum = ingresos || null;
+      var anteriores = r.historial.filter(function(h){ return h.per < per; }).sort(function(a,b){ return a.per<b.per?-1:1; });
+      var premiosAnterior = anteriores.length ? anteriores[anteriores.length-1].premiosInvertidos : null;
+      var primasNuevasCalc = (premiosAcum!=null && premiosAnterior!=null) ? round2(premiosAcum-premiosAnterior) : null;
+
       if(existingR){
-        var deltaPrimas = primasNuevasVal - (existingR.primasNuevas||0);
-        r.primasInvertidas = round2((r.primasInvertidas||0) + deltaPrimas);
         existingR.total = valorTotal!=null?valorTotal:existingR.total;
-        existingR.primasNuevas = primasNuevasVal;
+        if(premiosAcum!=null) existingR.premiosInvertidos = premiosAcum;
+        if(primasNuevasCalc!=null) existingR.primasNuevas = primasNuevasCalc;
         existingR.notas = notas;
         if(pendingRl360Composicion) existingR.composicion = pendingRl360Composicion;
       } else {
-        r.primasInvertidas = round2((r.primasInvertidas||0) + primasNuevasVal);
-        var entryR = { per:per, total: valorTotal||0, primasNuevas: primasNuevasVal, notas: notas };
+        var entryR = { per:per, total: valorTotal||0, primasNuevas: primasNuevasCalc, notas: notas };
+        if(premiosAcum!=null) entryR.premiosInvertidos = premiosAcum;
         if(pendingRl360Composicion) entryR.composicion = pendingRl360Composicion;
         r.historial.push(entryR);
       }
+      // r.primasInvertidas siempre refleja el premiosInvertidos del periodo cronológicamente MÁS RECIENTE
+      // ya cargado — así funciona sin importar el orden en que se suban los estados de cuenta.
+      var todosOrdenados = r.historial.slice().sort(function(a,b){ return a.per<b.per?-1:1; });
+      var ultimoConDato = todosOrdenados.slice().reverse().find(function(h){ return h.premiosInvertidos!=null; });
+      if(ultimoConDato) r.primasInvertidas = ultimoConDato.premiosInvertidos;
+      if(pendingRl360NumeroPoliza) r.numeroPoliza = pendingRl360NumeroPoliza;
       pendingRl360Composicion = null;
+      pendingRl360NumeroPoliza = null;
       var accR = findInv(t.investmentId);
       if(accR && valorTotal!=null) accR.value = valorTotal;
     }
