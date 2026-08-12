@@ -77,6 +77,12 @@
   .nav-item:hover{background:var(--panel-2);color:var(--text);}
   .nav-item.active{background:rgba(16,185,129,.13);color:var(--emerald);font-weight:700;}
   .nav-item.active svg{opacity:1;}
+  .nav-item.sub{padding-left:22px;font-size:12.5px;}
+  .nav-item.sub2{padding-left:34px;font-size:12px;}
+  .nav-sublabel{
+    font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--text-dim);
+    text-transform:uppercase;padding:6px 10px 2px 22px;opacity:.75;
+  }
 
   .sidebar-footer{
     margin-top:auto;display:flex;align-items:center;gap:10px;padding:12px 8px 4px;
@@ -354,49 +360,37 @@
 
     <div class="nav-section">
       <div class="nav-label">Activos</div>
-      <button class="nav-item" data-nav="resumen" id="navInversiones">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8M21 7v6M21 7h-6"></path></svg>
-        Inversiones
-      </button>
-      <button class="nav-item" data-nav="cripto">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M9.5 8.5h3.2a1.8 1.8 0 0 1 0 3.6H9.5m0 0h3.6a1.8 1.8 0 0 1 0 3.6H9.5m1-9v1.2m0 8.8v1.2m2.6-11.2v1.2m0 8.8v1.2"></path></svg>
-        Cripto
-      </button>
-      <button class="nav-item" data-nav="jubilacion">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5Z"></path><path d="M6 12v5c0 1.5 2.7 3 6 3s6-1.5 6-3v-5"></path></svg>
-        Jubilación
-      </button>
-    </div>
-
-    <div class="nav-section">
-      <div class="nav-label">Patrimonio Especializado</div>
-      <button class="nav-item" data-nav="sw-local">
+      <div class="nav-sublabel">Inversiones</div>
+      <button class="nav-item sub" data-nav="sw-local">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M7 9h10M7 13h6M7 17h4"></path></svg>
         SW Local
       </button>
-      <button class="nav-item" data-nav="sw-pershing">
+      <button class="nav-item sub" data-nav="sw-pershing">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3c2.5 2.5 3.8 5.7 3.8 9s-1.3 6.5-3.8 9c-2.5-2.5-3.8-5.7-3.8-9S9.5 5.5 12 3Z"></path></svg>
         SW Pershing
       </button>
-      <button class="nav-item" data-nav="rl360">
+      <button class="nav-item sub" data-nav="rl360">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 3 7v6c0 5 3.8 8.7 9 9 5.2-.3 9-4 9-9V7l-9-5Z"></path></svg>
         RL360
       </button>
-      <button class="nav-item" data-nav="fortesza">
+      <button class="nav-item sub" data-open-modal="interactive">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8M21 7v6M21 7h-6"></path></svg>
+        Interactive Broker
+      </button>
+      <button class="nav-item sub" data-nav="fortesza">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8M21 7v6M21 7h-6"></path></svg>
         Fortesza
       </button>
-      <button class="nav-item" data-nav="inmuebles">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M4 21V9l8-5 8 5v12M9 21v-6h6v6"></path></svg>
-        Inmuebles
-      </button>
-      <button class="nav-item" data-nav="solution-group">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2.5"></rect><path d="M8 12h8M8 8h5M8 16h4"></path></svg>
-        Solution Group
-      </button>
-      <button class="nav-item" data-nav="dividend-plan">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg>
-        Proyección Dividendos
+      <div class="nav-sublabel" style="padding-left:34px;">Profuturo</div>
+      <button class="nav-item sub2" data-custom-cuenta="profuturo:edson">Pro Fut. Edson</button>
+      <button class="nav-item sub2" data-custom-cuenta="profuturo:diego">Pro Fut. Diego</button>
+      <button class="nav-item sub2" data-custom-cuenta="profuturo:isabella">Pro Fut. Isabella</button>
+      <div class="nav-sublabel" style="padding-left:34px;">Cesantías</div>
+      <button class="nav-item sub2" data-open-modal="prof_ces_edson">Ces. Edson</button>
+      <button class="nav-item sub2" data-open-modal="prof_ces_mho">Ces. Monique</button>
+      <button class="nav-item" data-nav="cripto">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M9.5 8.5h3.2a1.8 1.8 0 0 1 0 3.6H9.5m0 0h3.6a1.8 1.8 0 0 1 0 3.6H9.5m1-9v1.2m0 8.8v1.2m2.6-11.2v1.2m0 8.8v1.2"></path></svg>
+        Criptos
       </button>
     </div>
 
@@ -410,19 +404,19 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M4 21V9l8-5 8 5v12M9 21v-6h6v6"></path></svg>
         Hipotecas
       </button>
+      <button class="nav-item" data-nav="jubilacion">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5Z"></path><path d="M6 12v5c0 1.5 2.7 3 6 3s6-1.5 6-3v-5"></path></svg>
+        Jubilación
+      </button>
     </div>
 
-    <div class="nav-section" id="navCustomModulesSection" style="display: block;">
+    <div class="nav-section" id="navCustomModulesSection" style="display: none;">
       <div class="nav-label">Módulos Personalizados</div>
-      <div id="navCustomModulesList"><button class="nav-item" data-nav="custom:profuturo"><span style="font-size:15px;width:17px;text-align:center;flex:0 0 auto;">🎓</span>Profuturo</button></div>
+      <div id="navCustomModulesList"></div>
     </div>
 
     <div class="nav-section">
       <div class="nav-label">Sistema</div>
-      <button class="nav-item" data-nav="notas">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"></path><path d="M14 3v6h6M9 13h6M9 17h6"></path></svg>
-        Notas Familiares
-      </button>
       <button class="nav-item" data-nav="module-admin">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect><rect x="14" y="14" width="7" height="7" rx="1.5"></rect></svg>
         Administrador de Módulos
@@ -481,7 +475,10 @@
               <select id="chartFocusSelect" style="background:var(--panel-2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;max-width:220px;"><option value="total">📊 Portafolio Total (Consolidado)</option><option value="solutionGroup">📦 Solution Group — Extracción Anual</option><optgroup label="Liquidez"><option value="inv:caja_fuerte">Caja Fuerte</option><option value="inv:it_consulting">Cuenta Ahorro IT Consulting</option><option value="inv:global_ahorro">Global Bank Ahorra Más</option><option value="inv:global_tap">Global Bank Tap (Online)</option><option value="inv:unfcu">UNFCU — Ahorro USA</option></optgroup><optgroup label="Renta Fija"><option value="inv:global_max">Global Max (4%)</option><option value="inv:sweetwater">Sweetwater Securities (Bonos)</option><option value="inv:rl360">RL 360 (Inglaterra)</option></optgroup><optgroup label="Renta Variable"><option value="inv:interactive">Interactive Broker (VOO + QQQM)</option><option value="inv:pershing">Pershing NY (Acciones)</option><option value="inv:blackrock">Black Rock</option></optgroup><optgroup label="Jubilación"><option value="inv:prof_edson">Profuturo — Edson</option><option value="inv:prof_ces_edson">Profuturo Cesantía — Edson</option><option value="inv:prof_ces_mho">Profuturo Cesantía — Monique</option><option value="inv:prof_diego">Profuturo — Diego</option><option value="inv:prof_isabella">Profuturo — Isabella</option></optgroup><optgroup label="Cripto"><option value="inv:bit2me">Bit2me</option><option value="inv:blockfi">Cripto — Blockfi / PayPal</option></optgroup><optgroup label="Distressed"><option value="inv:fortesa">Fortesa</option></optgroup><optgroup label="Profuturo"><option value="custom:profuturo:edson">Edson</option><option value="custom:profuturo:diego">Diego</option><option value="custom:profuturo:isabella">Isabella</option></optgroup></select>
             </div>
             <p class="sub" id="lineChartSub">Desde Dic 2021 hasta Jul 2026</p>
-            <div class="month-bar" id="chartPeriodBar" style="margin:10px 0 4px;"><button class="month-btn on" data-period="all">Todo el Histórico</button><button class="month-btn" data-period="ytd">YTD</button><button class="month-btn" data-period="2026">2026</button><button class="month-btn" data-period="2025">2025</button><button class="month-btn" data-period="2024">2024</button></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin:10px 0 4px;">
+              <div class="month-bar" id="chartPeriodBar" style="margin-bottom:0;"><button class="month-btn on" data-period="all">Todo el Histórico</button><button class="month-btn" data-period="ytd">YTD</button><button class="month-btn" data-period="2026">2026</button><button class="month-btn" data-period="2025">2025</button><button class="month-btn" data-period="2024">2024</button></div>
+              <div class="month-bar" id="chartGranBar" style="margin-bottom:0;"><button class="month-btn on" data-gran="mensual">Mensual</button><button class="month-btn" data-gran="trimestral">Trimestral</button><button class="month-btn" data-gran="anual">Anual</button></div>
+            </div>
             <div id="chartFocusBadge" style="font-size:11.5px;color:var(--text-muted);margin-bottom:10px;">Viendo evolución histórica de: <strong style="color:var(--text)">Portafolio Total (Consolidado)</strong></div>
             <div class="chart-svg-wrap" id="lineChartWrap" style="position:relative;"><svg viewBox="0 0 800 300" preserveAspectRatio="none"><defs><lineargradient id="areaGrad1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#10b981" stop-opacity="0.35"></stop><stop offset="100%" stop-color="#10b981" stop-opacity="0"></stop></lineargradient></defs><line class="grid-line" x1="54" x2="784" y1="274" y2="274"></line><line class="grid-line" x1="54" x2="784" y1="248" y2="248"></line><line class="grid-line" x1="54" x2="784" y1="222" y2="222"></line><line class="grid-line" x1="54" x2="784" y1="196" y2="196"></line><line class="grid-line" x1="54" x2="784" y1="170" y2="170"></line><line class="grid-line" x1="54" x2="784" y1="144" y2="144"></line><line class="grid-line" x1="54" x2="784" y1="118" y2="118"></line><line class="grid-line" x1="54" x2="784" y1="92" y2="92"></line><line class="grid-line" x1="54" x2="784" y1="66" y2="66"></line><line class="grid-line" x1="54" x2="784" y1="40" y2="40"></line><line class="grid-line" x1="54" x2="784" y1="14" y2="14"></line><text class="axis-label" x="44" y="277" text-anchor="end">$350K</text><text class="axis-label" x="44" y="251" text-anchor="end">$400K</text><text class="axis-label" x="44" y="225" text-anchor="end">$450K</text><text class="axis-label" x="44" y="199" text-anchor="end">$500K</text><text class="axis-label" x="44" y="173" text-anchor="end">$550K</text><text class="axis-label" x="44" y="147" text-anchor="end">$600K</text><text class="axis-label" x="44" y="121" text-anchor="end">$650K</text><text class="axis-label" x="44" y="95" text-anchor="end">$700K</text><text class="axis-label" x="44" y="69" text-anchor="end">$750K</text><text class="axis-label" x="44" y="43" text-anchor="end">$800K</text><text class="axis-label" x="44" y="17" text-anchor="end">$850K</text><path d="M54,255.77262199999998 C66.16666666666667,254.68928866666664 102.66666666666667,252.87521406666664 127,249.27262199999998 C151.33333333333334,245.67002993333332 175.66666666666666,236.28670706666668 200,234.1570696 C224.33333333333334,232.02743213333332 248.66666666666666,245.9885126 273,236.4947972 C297.3333333333333,227.00108179999998 321.6666666666667,197.88912966666663 346,177.19477719999998 C370.3333333333333,156.50042473333332 394.6666666666667,123.94992926666667 419,112.32868240000002 C443.3333333333333,100.70743553333337 467.6666666666667,118.67900560000004 492,107.46729600000003 C516.3333333333334,96.25558640000003 540.6666666666666,56.81048026666665 565,45.05842479999998 C589.3333333333334,33.306369333333315 613.6666666666666,37.8499768 638,36.95496320000001 C662.3333333333334,36.05994960000002 686.6666666666666,40.52011180000002 711,39.68834320000002 C735.3333333333334,38.856574600000016 771.8333333333334,33.25168353333333 784,31.964351599999986  L784,274 L54,274 Z" fill="url(#areaGrad1)" stroke="none"></path><path d="M54,255.77262199999998 C66.16666666666667,254.68928866666664 102.66666666666667,252.87521406666664 127,249.27262199999998 C151.33333333333334,245.67002993333332 175.66666666666666,236.28670706666668 200,234.1570696 C224.33333333333334,232.02743213333332 248.66666666666666,245.9885126 273,236.4947972 C297.3333333333333,227.00108179999998 321.6666666666667,197.88912966666663 346,177.19477719999998 C370.3333333333333,156.50042473333332 394.6666666666667,123.94992926666667 419,112.32868240000002 C443.3333333333333,100.70743553333337 467.6666666666667,118.67900560000004 492,107.46729600000003 C516.3333333333334,96.25558640000003 540.6666666666666,56.81048026666665 565,45.05842479999998 C589.3333333333334,33.306369333333315 613.6666666666666,37.8499768 638,36.95496320000001 C662.3333333333334,36.05994960000002 686.6666666666666,40.52011180000002 711,39.68834320000002 C735.3333333333334,38.856574600000016 771.8333333333334,33.25168353333333 784,31.964351599999986 " fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="54" cy="255.77262199999998" r="4.5" fill="#10b981" stroke="var(--panel)" stroke-width="2.5"></circle><circle cx="127" cy="249.27262199999998" r="4.5" fill="#10b981" stroke="var(--panel)" stroke-width="2.5"></circle><circle cx="200" cy="234.1570696" r="4.5" fill="#10b981" stroke="var(--panel)" stroke-width="2.5"></circle><circle cx="273" cy="236.4947972" r="4.5" fill="#10b981" stroke="var(--panel)" stroke-width="2.5"></circle><circle cx="346" cy="177.19477719999998" r="4.5" fill="#10b981" stroke="var(--panel)" stroke-width="2.5"></circle><circle cx="419" cy="112.32868240000002" r="4.5" fill="#10b981" stroke="var(--panel)" stroke-width="2.5"></circle><circle cx="492" cy="107.46729600000003" r="4.5" fill="#10b981" stroke="var(--panel)" stroke-width="2.5"></circle><circle cx="565" cy="45.05842479999998" r="4.5" fill="#10b981" stroke="var(--panel)" stroke-width="2.5"></circle><circle cx="638" cy="36.95496320000001" r="4.5" fill="#10b981" stroke="var(--panel)" stroke-width="2.5"></circle><circle cx="711" cy="39.68834320000002" r="4.5" fill="#10b981" stroke="var(--panel)" stroke-width="2.5"></circle><circle cx="784" cy="31.964351599999986" r="4.5" fill="#10b981" stroke="var(--panel)" stroke-width="2.5"></circle><text class="axis-label" x="54" y="294" text-anchor="middle">Dic 2021</text><text class="axis-label" x="127" y="294" text-anchor="middle">Ene 2022</text><text class="axis-label" x="200" y="294" text-anchor="middle">2023</text><text class="axis-label" x="273" y="294" text-anchor="middle">Oct 2023</text><text class="axis-label" x="346" y="294" text-anchor="middle">Nov 2024</text><text class="axis-label" x="419" y="294" text-anchor="middle">Jun 2025</text><text class="axis-label" x="492" y="294" text-anchor="middle">Ago 2025</text><text class="axis-label" x="565" y="294" text-anchor="middle">Ene 2026</text><text class="axis-label" x="638" y="294" text-anchor="middle">Feb 2026</text><text class="axis-label" x="711" y="294" text-anchor="middle">Mar 2026</text><text class="axis-label" x="784" y="294" text-anchor="middle">Jul 2026</text></svg></div>
           </div>
@@ -521,16 +518,19 @@
       <div class="page" id="page-jubilacion">
         <div class="module-note">Este es el indicador clave para tu independencia financiera: cuánto dinero neto entra realmente a tu bolsillo, después de cargos y comisiones, sin contar capital que sigue invertido (como Fortesza).</div>
 
-        <div class="month-bar" id="flujoAnioSelector" style="margin-bottom:12px;"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+          <div class="month-bar" id="flujoAnioSelector" style="margin-bottom:0;"></div>
+          <div class="month-bar" id="flujoVistaSelector" style="margin-bottom:0;"></div>
+        </div>
 
         <div class="kpi-grid-3" id="flujoKpis"></div>
 
         <div class="table-card">
           <div class="table-card-head">
-            <h3>Resumen Anual de Ingresos al Bolsillo</h3>
+            <h3 id="flujoTableTitle">Resumen Anual de Ingresos al Bolsillo</h3>
           </div>
           <table>
-            <thead>
+            <thead id="flujoTableHead">
               <tr>
                 <th>Fuente</th>
                 <th>Tipo</th>
@@ -1181,7 +1181,8 @@
   </div>
 </div>
 
-<div id="chartTooltip" style="position: fixed; display: block; pointer-events: none; background: rgb(13, 20, 32); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 12px; color: var(--text); box-shadow: rgba(0, 0, 0, 0.4) 0px 8px 20px; z-index: 200; white-space: nowrap; left: 855px; top: 495px;"><div style="font-weight:700;margin-bottom:3px;">Ene 2026</div><div style="color:#10b981">$790,272.26</div></div>
+<div id="chartTooltip" style="position: fixed; display: none; pointer-events: none; background: rgb(13, 20, 32); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 12px; color: var(--text); box-shadow: rgba(0, 0, 0, 0.4) 0px 8px 20px; z-index: 200; white-space: nowrap;"></div>
+<div id="kpiTooltip" style="position:fixed;display:none;pointer-events:none;background:rgb(13,20,32);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:12.5px;color:var(--text);box-shadow:rgba(0,0,0,.4) 0px 8px 20px;z-index:200;min-width:200px;"></div>
 
 <div id="toast" class="toast"></div>
 
@@ -1271,7 +1272,10 @@
     pageSub: document.getElementById("pageSub"),
     flujoKpis: document.getElementById("flujoKpis"),
     flujoTableBody: document.getElementById("flujoTableBody"),
+    flujoTableHead: document.getElementById("flujoTableHead"),
+    flujoTableTitle: document.getElementById("flujoTableTitle"),
     flujoAnioSelector: document.getElementById("flujoAnioSelector"),
+    flujoVistaSelector: document.getElementById("flujoVistaSelector"),
     swlKpis: document.getElementById("swlKpis"),
     swlBonosTable: document.getElementById("swlBonosTable"),
     swlFlujoTable: document.getElementById("swlFlujoTable"),
@@ -1425,8 +1429,10 @@
     lineChartSub: document.getElementById("lineChartSub"),
     chartFocusSelect: document.getElementById("chartFocusSelect"),
     chartPeriodBar: document.getElementById("chartPeriodBar"),
+    chartGranBar: document.getElementById("chartGranBar"),
     chartFocusBadge: document.getElementById("chartFocusBadge"),
     chartTooltip: document.getElementById("chartTooltip"),
+    kpiTooltip: document.getElementById("kpiTooltip"),
     donutWrap: document.getElementById("donutWrap"),
     invTableBody: document.getElementById("invTableBody"),
     cloudPill: document.getElementById("cloudPill"),
@@ -2064,24 +2070,64 @@
     var first = hist.length ? hist[0].value : total;
     var growthPct = first ? ((total-first)/first*100) : 0;
 
+    function tipRow(label, val, pct){
+      return "<div style='display:flex;justify-content:space-between;gap:16px;padding:2px 0;'><span style='color:var(--text-dim)'>" + escapeHtml(label) + "</span><span style='font-weight:600;white-space:nowrap;'>" + fmtMoney(val) + (pct!=null?" · "+pct.toFixed(1)+"%":"") + "</span></div>";
+    }
+    function tipHeader(label, val){
+      return "<div style='font-weight:700;margin-bottom:6px;border-bottom:1px solid var(--border);padding-bottom:6px;'>" + escapeHtml(label) + ": " + fmtMoney(val) + "</div>";
+    }
+
+    var portTip = tipHeader("Portafolio Total", total) +
+      CAT_ORDER.map(function(c){ var v = totalByCat(c); return v>0 ? tipRow(c, v, total?v/total*100:0) : ""; }).join("");
+
+    var mortRows = backup.state.mortgages || [];
+    var netTip = tipHeader("Patrimonio Neto", netWorth) +
+      tipRow("Portafolio Total", total) +
+      (mortRows.length ? mortRows.map(function(m){ return tipRow("− " + (m.name||"Hipoteca"), -(m.balance||0)); }).join("") : tipRow("Hipotecas", 0)) ;
+
+    var liqInvs = investments().filter(function(a){ return a.cat === "Liquidez"; }).sort(function(a,b){ return (b.value||0)-(a.value||0); });
+    var liqTip = tipHeader("Liquidez Disponible", liquidez) +
+      liqInvs.map(function(a){ return tipRow(a.name, a.value||0, liquidez?(a.value||0)/liquidez*100:0); }).join("");
+
+    var growthTip = tipHeader("Crecimiento desde " + (hist[0] ? hist[0].label : ""), total-first) +
+      tipRow("Valor inicial (" + (hist[0]?hist[0].label:"—") + ")", first) +
+      tipRow("Valor actual", total) +
+      "<div style='display:flex;justify-content:space-between;gap:16px;padding:4px 0 0;margin-top:4px;border-top:1px solid var(--border);'><span style='color:var(--text-dim)'>Variación</span><span style='font-weight:700;white-space:nowrap;color:" + (growthPct>=0?"var(--emerald)":"var(--red)") + "'>" + (growthPct>=0?"+":"") + fmtMoney(total-first) + " (" + (growthPct>=0?"+":"") + growthPct.toFixed(1) + "%)</span></div>";
+
     var cards = [
-      {accent:"var(--emerald)", label:"Portafolio Total", value:fmtMoney(total),
+      {accent:"var(--emerald)", label:"Portafolio Total", value:fmtMoney(total), tip:portTip,
        foot:'<span class="foot ' + (diff>=0?"up":"down") + '">' + fmtMoney(Math.abs(diff)) + " (" + Math.abs(diffPct).toFixed(1) + "%) vs período anterior</span>"},
-      {accent:"var(--blue)", label:"Patrimonio Neto", value:fmtMoney(netWorth),
+      {accent:"var(--blue)", label:"Patrimonio Neto", value:fmtMoney(netWorth), tip:netTip,
        foot:"Portafolio – Hipotecas documentadas"},
-      {accent:"var(--amber)", label:"Liquidez Disponible", value:fmtMoney(liquidez),
+      {accent:"var(--amber)", label:"Liquidez Disponible", value:fmtMoney(liquidez), tip:liqTip,
        foot:(total ? (liquidez/total*100).toFixed(1) : "0.0") + "% del portafolio total"},
-      {accent:"var(--violet)", label:"Crecimiento desde " + (hist[0] ? hist[0].label : ""), value:(growthPct>=0?"+":"") + growthPct.toFixed(0) + "%",
+      {accent:"var(--violet)", label:"Crecimiento desde " + (hist[0] ? hist[0].label : ""), value:(growthPct>=0?"+":"") + growthPct.toFixed(0) + "%", tip:growthTip,
        foot: fmtMoney(first,2) + " → " + fmtMoney(total,2)}
     ];
 
-    els.summaryGrid.innerHTML = cards.map(function(c){
-      return '<div class="summary-card" style="--accent:' + c.accent + '">' +
+    els.summaryGrid.innerHTML = cards.map(function(c, i){
+      return '<div class="summary-card kpi-hoverable" style="--accent:' + c.accent + ';cursor:help;" data-kpi-idx="' + i + '">' +
         '<div class="label">' + escapeHtml(c.label.toUpperCase()) + '</div>' +
         '<div class="value">' + c.value + '</div>' +
         '<div class="foot">' + (c.foot.indexOf('<span') === 0 ? c.foot : escapeHtml(c.foot)) + '</div>' +
       '</div>';
     }).join("");
+
+    els.summaryGrid.querySelectorAll(".kpi-hoverable").forEach(function(el){
+      var idx = parseInt(el.getAttribute("data-kpi-idx"), 10);
+      el.addEventListener("mouseenter", function(){
+        els.kpiTooltip.innerHTML = cards[idx].tip;
+        els.kpiTooltip.style.display = "block";
+      });
+      el.addEventListener("mousemove", function(e){
+        var tw = els.kpiTooltip.offsetWidth || 220, th = els.kpiTooltip.offsetHeight || 100;
+        var left = Math.min(e.clientX + 16, window.innerWidth - tw - 12);
+        var top = Math.min(e.clientY + 16, window.innerHeight - th - 12);
+        els.kpiTooltip.style.left = left + "px";
+        els.kpiTooltip.style.top = top + "px";
+      });
+      el.addEventListener("mouseleave", function(){ els.kpiTooltip.style.display = "none"; });
+    });
   }
 
   /* ---------- line chart ---------- */
@@ -2113,7 +2159,7 @@
     var values = hist.map(function(h){return h.value;});
     var rawMin = Math.min.apply(null, values), rawMax = Math.max.apply(null, values);
     var span = rawMax - rawMin;
-    var step = span > 200000 ? 50000 : span > 20000 ? 5000 : span > 2000 ? 500 : 50;
+    var step = span > 200000 ? 100000 : span > 20000 ? 5000 : span > 2000 ? 500 : 50;
     var niceMin = Math.floor(rawMin/step)*step;
     var niceMax = Math.ceil(rawMax/step)*step;
     if(niceMax === niceMin) niceMax += step;
@@ -2184,6 +2230,32 @@
   /* ---------- foco del gráfico principal: total, cuenta específica, o cuenta de módulo personalizado ---------- */
   var chartFocus = { type:"total" };
   var chartPeriod = "all";
+  var chartGran = "mensual";
+  var CHART_MES_NUM = { "Ene":1,"Feb":2,"Mar":3,"Abr":4,"May":5,"Jun":6,"Jul":7,"Ago":8,"Sep":9,"Oct":10,"Nov":11,"Dic":12 };
+  function bucketKeyForPoint(p, granularity){
+    var year, month;
+    if(p.per){ year = p.per.slice(0,4); month = parseInt(p.per.slice(5,7),10) || 1; }
+    else {
+      var parts = (p.label||"").split(" ");
+      if(parts.length===2 && CHART_MES_NUM[parts[0]]){ month = CHART_MES_NUM[parts[0]]; year = parts[1]; }
+      else { year = parts[parts.length-1]; month = 1; }
+    }
+    if(granularity==="anual") return year;
+    if(granularity==="trimestral") return year + "-Q" + Math.ceil(month/3);
+    return year + "-" + String(month).padStart(2,"0");
+  }
+  // agrupa la serie por mes/trimestre/año, quedándose con el ÚLTIMO valor real de cada periodo
+  // (no promedia ni inventa datos — solo reduce la densidad de puntos mostrados)
+  function aggregateSeries(points, granularity){
+    if(granularity === "mensual" || points.length < 2) return points;
+    var byBucket = {}, order = [];
+    points.forEach(function(p){
+      var key = bucketKeyForPoint(p, granularity);
+      if(!(key in byBucket)) order.push(key);
+      byBucket[key] = p;
+    });
+    return order.map(function(key){ return byBucket[key]; });
+  }
   var CHART_PERIODS = [
     { id:"all", label:"Todo el Histórico" },
     { id:"ytd", label:"YTD" },
@@ -2323,6 +2395,7 @@
     els.chartTooltip.style.display = "none";
     var resolved = resolveEntitySeries(chartFocus);
     var filtered = filterSeriesByPeriod(resolved.points, chartPeriod);
+    filtered = aggregateSeries(filtered, chartGran);
 
     if(!filtered.length){
       els.lineChartWrap.innerHTML = '<div class="mv-empty">Sin historial disponible para esta cuenta todavía. Agrega movimientos o carga un estado de cuenta para verlo aquí.</div>';
@@ -2340,6 +2413,7 @@
       (resolved.single ? " <span style='color:var(--text-dim)'>· sin historial mensual, solo saldo actual</span>" : "");
 
     els.chartPeriodBar.querySelectorAll(".month-btn").forEach(function(b){ b.classList.toggle("on", b.getAttribute("data-period")===chartPeriod); });
+    if(els.chartGranBar) els.chartGranBar.querySelectorAll(".month-btn").forEach(function(b){ b.classList.toggle("on", b.getAttribute("data-gran")===chartGran); });
   }
 
   var _chartControlsWired = false;
@@ -2356,6 +2430,11 @@
       chartFocus = valueToFocus(els.chartFocusSelect.value);
       renderFocusChart();
     });
+    if(els.chartGranBar){
+      els.chartGranBar.querySelectorAll(".month-btn").forEach(function(btn){
+        btn.addEventListener("click", function(){ chartGran = btn.getAttribute("data-gran"); renderFocusChart(); });
+      });
+    }
   }
 
   function renderLineChart(){
@@ -2434,7 +2513,7 @@
 
     var subtotal = round2(rows.reduce(function(s,acc){ return s + (acc.value||0); }, 0));
     var subtotalPct = total ? (subtotal/total*100) : 0;
-    els.invTableBody.innerHTML += '<tr style="font-weight:700;border-top:2px solid var(--border);">' +
+    els.invTableBody.innerHTML += '<tr class="total-row" style="font-weight:700;border-top:2px solid var(--border);">' +
       '<td class="name">TOTAL ' + (invTableTab === "liquidez" ? "LIQUIDEZ" : (invTableTab === "cripto" ? "CRIPTO" : "INVERSIONES")) + '</td>' +
       '<td></td>' +
       '<td class="num">' + fmtMoney(subtotal) + '</td>' +
@@ -2448,6 +2527,7 @@
         openModal(id);
       });
     });
+    makeSortable(els.invTableBody.closest("table"));
   }
 
   document.getElementById("invTableTabs").addEventListener("click", function(e){
@@ -2465,6 +2545,78 @@
     return "rgba(" + r + "," + g + "," + b + "," + alpha + ")";
   }
 
+  /* ---------- columnas ordenables (reutilizable en cualquier tabla) ----------
+     Funciona tanto con tablas <thead>/<tbody> normales como con las tablas "matrix"
+     (una sola <table> donde la primera <tr> son los <th> y el resto son filas de datos,
+     sin envoltorio <thead>). Las filas de total (class contiene "total") quedan fijas al
+     final y nunca participan del orden. Llamar de nuevo tras cada re-render es seguro:
+     no vuelve a enganchar los listeners (usa table._sortWired), pero SÍ vuelve a limpiar
+     el indicador visual, ya que el orden no se conserva entre renders con datos nuevos. */
+  function makeSortable(table){
+    if(!table) return;
+    var headerRow = table.tHead ? table.tHead.rows[0] : table.rows[0];
+    if(!headerRow) return;
+    table.querySelectorAll("th").forEach(function(th, idx){
+      th.style.cursor = "pointer";
+      th.style.userSelect = "none";
+      if(!th.querySelector(".sort-ind")){
+        var ind = document.createElement("span");
+        ind.className = "sort-ind";
+        ind.style.cssText = "margin-left:4px;opacity:.4;font-size:10px;";
+        ind.textContent = "⇅";
+        th.appendChild(ind);
+      }
+      if(th._sortWired) return;
+      th._sortWired = true;
+      th.addEventListener("click", function(){ sortTableByColumn(table, idx); });
+    });
+  }
+
+  function sortTableByColumn(table, colIdx){
+    var tbody = table.tBodies && table.tBodies[0];
+    var headerRow = table.tHead ? table.tHead.rows[0] : table.rows[0];
+    var allRows = tbody ? Array.prototype.slice.call(tbody.rows) : Array.prototype.slice.call(table.rows).slice(1);
+    var pinned = allRows.filter(function(r){ return /total/i.test(r.className); });
+    var sortable = allRows.filter(function(r){ return !/total/i.test(r.className); });
+
+    var dir = table._sortCol === colIdx && table._sortDir === "asc" ? "desc" : "asc";
+    table._sortCol = colIdx; table._sortDir = dir;
+
+    function cellVal(row){
+      var cell = row.cells[colIdx];
+      if(!cell) return "";
+      var txt = (cell.textContent || "").replace(/⇅|▲|▼/g,"").trim();
+      var numTxt = txt.replace(/[^0-9.\-]/g, "");
+      if(numTxt && !isNaN(parseFloat(numTxt)) && /[0-9]/.test(txt)){
+        // evita interpretar fechas tipo "12/05/2028" como número — si el texto original
+        // trae "/" no se trata como numérico
+        if(txt.indexOf("/") === -1) return parseFloat(numTxt);
+      }
+      return txt.toLowerCase();
+    }
+
+    sortable.sort(function(a, b){
+      var va = cellVal(a), vb = cellVal(b);
+      var cmp;
+      if(typeof va === "number" && typeof vb === "number") cmp = va - vb;
+      else cmp = String(va).localeCompare(String(vb));
+      return dir === "asc" ? cmp : -cmp;
+    });
+
+    var frag = document.createDocumentFragment();
+    sortable.concat(pinned).forEach(function(r){ frag.appendChild(r); });
+    if(tbody) tbody.appendChild(frag); else table.appendChild(frag);
+
+    if(headerRow){
+      Array.prototype.forEach.call(headerRow.cells, function(th, i){
+        var ind = th.querySelector(".sort-ind");
+        if(!ind) return;
+        ind.textContent = i === colIdx ? (dir === "asc" ? "▲" : "▼") : "⇅";
+        ind.style.opacity = i === colIdx ? "1" : ".4";
+      });
+    }
+  }
+
   function renderAll(){
     renderSummary();
     renderLineChart();
@@ -2476,6 +2628,8 @@
   function findInv(id){ return investments().find(function(a){ return a.id === id; }); }
 
   var flujoAnioSel = null;
+  var flujoVista = "anual";
+  var FLUJO_MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 
   // suma un arreglo de periodos {per, ing, car} (bonosLocalesHistorial) filtrado por año
   function sumHistArrayPorAnio(arr, anio){
@@ -2499,11 +2653,15 @@
   }
 
   function renderFlujo(){
-    var sw = findInv("sweetwater"), pe = findInv("pershing"), prof = findInv("prof_edson"), un = findInv("unfcu");
     var inmuebles = backup.state.inmuebles || [];
-    var apto = inmuebles.find(function(i){ return i.id === "apto"; });
+    var apto = inmuebles.find(function(i){ return i.id === "apto"; }); // Hyde Park
+    var staMaria = inmuebles.find(function(i){ return i.id === "sta_maria"; });
     var aptoCostoMensual = apto ? (apto.gastosFijos||[]).reduce(function(s,g){ return s+(g.monto||0); },0) : 0;
+    var staCostoMensual = staMaria ? (staMaria.gastosFijos||[]).reduce(function(s,g){ return s+(g.monto||0); },0) : 0;
     var ftz = backup.state.fortesza;
+    var globalMax = findInv("global_max");
+    var gmTasa = globalMax ? (globalMax.tasaAnual != null ? globalMax.tasaAnual : 0.04) : 0;
+    var gmInteresAnual = globalMax ? round2(globalMax.value * gmTasa) : 0;
 
     // años disponibles: cualquier año con datos reales en alguna fuente, más el año calendario actual — así la
     // pestaña del año en curso (y del siguiente, cuando llegue) aparece sola, sin tener que tocar el código cada vez
@@ -2511,8 +2669,7 @@
     (backup.state.bonosLocalesHistorial||[]).forEach(function(h){ if(h.per) aniosSet[h.per.slice(0,4)] = true; });
     Object.keys(backup.state.pershingHistorial||{}).forEach(function(p){ aniosSet[p.slice(0,4)] = true; });
     (apto && apto.alquileres || []).forEach(function(a){ if(a.per) aniosSet[a.per.slice(0,4)] = true; });
-    if(prof && prof.flujoMensual && prof.flujoMensual.per) aniosSet[prof.flujoMensual.per.slice(0,4)] = true;
-    if(un && un.flujoMensual && un.flujoMensual.per) aniosSet[un.flujoMensual.per.slice(0,4)] = true;
+    (staMaria && staMaria.alquileres || []).forEach(function(a){ if(a.per) aniosSet[a.per.slice(0,4)] = true; });
     aniosSet[String(new Date().getFullYear())] = true;
     var aniosLista = Object.keys(aniosSet).sort().reverse();
     if(!flujoAnioSel || aniosLista.indexOf(flujoAnioSel) === -1) flujoAnioSel = aniosLista[0];
@@ -2524,98 +2681,173 @@
       btn.addEventListener("click", function(){ flujoAnioSel = btn.getAttribute("data-anio"); renderFlujo(); });
     });
 
-    var swAnio = sumHistArrayPorAnio(backup.state.bonosLocalesHistorial, flujoAnioSel);
-    var peAnio = sumHistObjPorAnio(backup.state.pershingHistorial, flujoAnioSel);
-
-    // Profuturo y UNFCU todavía no tienen historial mensual acumulable (solo el último dato cargado) —
-    // se muestra ese dato únicamente si cae dentro del año seleccionado, honestamente marcado como tal
-    function rowSnapshot(name, tipo, fm){
-      fm = fm || {};
-      var enEsteAnio = fm.per && fm.per.slice(0,4) === flujoAnioSel;
-      var bruto = enEsteAnio ? (fm.ing||0) : 0, cargos = enEsteAnio ? (fm.car||0) : 0;
-      return { name:name, tipo:tipo, bruto:bruto, cargos:cargos, neto:bruto-cargos, per: enEsteAnio?fm.per:null, sinHistorico:true };
-    }
-    function rowAcumulado(name, tipo, agg){
-      return { name:name, tipo:tipo, bruto:agg.bruto, cargos:agg.cargos, neto:agg.bruto-agg.cargos, per:agg.ultimoPer, meses:agg.meses };
-    }
-
-    var alquileresAnio = (apto && apto.alquileres || []).filter(function(a){ return a.per && a.per.slice(0,4)===flujoAnioSel; });
-    var aptoBruto = alquileresAnio.reduce(function(s,a){ return s+(a.monto||0); },0);
-    var hoy = new Date();
-    var mesesTranscurridos = (String(hoy.getFullYear())===flujoAnioSel) ? (hoy.getMonth()+1) : 12;
-    var aptoRentado = alquileresAnio.length > 0;
-    var aptoCargosEstimado = aptoRentado ? (aptoCostoMensual * mesesTranscurridos) : 0;
-
-    var rows = [
-      rowAcumulado("SW Local (bonos)", "Cupones", swAnio),
-      rowAcumulado("SW Pershing", "BlackRock + MM", peAnio),
-      rowSnapshot("Profuturo", "Réditos", prof && prof.flujoMensual),
-      rowSnapshot("UNFCU", "Interés", un && un.flujoMensual)
-    ];
-    rows.push({ name:"Apartamento", tipo:"Alquiler", bruto:aptoBruto, cargos:aptoCargosEstimado, neto: aptoRentado ? (aptoBruto-aptoCargosEstimado) : null, per:null, pending: !aptoRentado, estimadoCargos:true });
-
-    var globalMax = findInv("global_max");
-    if(globalMax){
-      var gmTasa = globalMax.tasaAnual != null ? globalMax.tasaAnual : 0.04;
-      var gmInteresAnual = round2(globalMax.value * gmTasa);
-      rows.push({ name:"Global Max (" + (gmTasa*100).toFixed(1) + "%)", tipo:"Interés", bruto:gmInteresAnual, cargos:0, neto:gmInteresAnual, per:null, estimadoProyeccion:true });
-    }
-
-    var totBruto = rows.reduce(function(s,r){return s+r.bruto;},0);
-    var totCargos = rows.reduce(function(s,r){return s+r.cargos;},0);
-    var totNeto = rows.reduce(function(s,r){return s+r.neto;},0);
-
-    var html = rows.map(function(r){
-      var badge;
-      if(r.sinHistorico){
-        badge = r.per
-          ? '<span class="pill" style="background:' + hexToRgba("#7c93ad",0.18) + ';color:var(--text-muted)">Solo ' + escapeHtml(r.per) + ' (sin histórico)</span>'
-          : '<span class="pill" style="background:' + hexToRgba("#f59e0b",0.15) + ';color:#f59e0b">Sin datos ' + escapeHtml(flujoAnioSel) + '</span>';
-      } else if(r.pending){
-        badge = '<span class="pill" style="background:' + hexToRgba("#f59e0b",0.15) + ';color:#f59e0b">Sin alquiler registrado ' + escapeHtml(flujoAnioSel) + '</span>';
-      } else if(r.estimadoProyeccion){
-        badge = '<span class="pill" style="background:' + hexToRgba("#7c93ad",0.18) + ';color:var(--text-muted)">Proyección (capital × tasa anual)</span>';
-      } else if(r.estimadoCargos){
-        badge = '<span class="pill" style="background:' + hexToRgba("#7c93ad",0.18) + ';color:var(--text-muted)">Cargos estimados</span>';
-      } else {
-        badge = '<span class="pill" style="background:' + hexToRgba("#10b981",0.15) + ';color:#10b981">' + (r.meses||0) + ' meses · hasta ' + escapeHtml(r.per||"—") + '</span>';
-      }
-      var pctReditoRow = totBruto ? (r.bruto/totBruto*100) : 0;
-      return '<tr>' +
-        '<td class="name">' + escapeHtml(r.name) + '</td>' +
-        '<td>' + escapeHtml(r.tipo) + '</td>' +
-        '<td class="num">' + (r.bruto>0 ? fmtMoney(r.bruto) : "—") + '</td>' +
-        '<td class="num" style="color:' + (r.cargos>0?"var(--red)":"var(--text-muted)") + '">' + (r.cargos>0 ? "-"+fmtMoney(r.cargos) : "$0.00") + '</td>' +
-        '<td class="num" style="font-weight:700;color:' + (r.neto==null?"var(--text-muted)":(r.neto>=0?"var(--emerald)":"var(--red)")) + '">' + (r.neto==null?"—":fmtMoney(r.neto)) + '</td>' +
-        '<td class="num">' + (r.bruto>0 ? pctReditoRow.toFixed(1)+"%" : "—") + '</td>' +
-        '<td>' + badge + '</td>' +
-      '</tr>';
+    var VISTAS = [["mensual","Mensual"],["trimestral","Trimestral"],["anual","Anual"]];
+    els.flujoVistaSelector.innerHTML = VISTAS.map(function(v){
+      return '<button class="month-btn' + (flujoVista===v[0]?' on':'') + '" data-vista="' + v[0] + '">' + v[1] + '</button>';
     }).join("");
+    els.flujoVistaSelector.querySelectorAll(".month-btn").forEach(function(btn){
+      btn.addEventListener("click", function(){ flujoVista = btn.getAttribute("data-vista"); renderFlujo(); });
+    });
 
-    html += '<tr class="total-row"><td colspan="2" style="text-align:right">TOTAL NETO AL BOLSILLO ' + escapeHtml(flujoAnioSel) + '</td>' +
-      '<td class="num">' + fmtMoney(totBruto) + '</td>' +
-      '<td class="num" style="color:var(--red)">-' + fmtMoney(totCargos) + '</td>' +
-      '<td class="num" style="font-size:15px;color:' + (totNeto>=0?"var(--emerald)":"var(--red)") + '">' + fmtMoney(totNeto) + '</td>' +
-      '<td class="num">100.0%</td>' +
-      '<td></td></tr>';
-
-    if(ftz && ftz.resumen){
-      html += '<tr class="info-row"><td class="name" style="color:var(--text)">Fortesza (factoring)</td><td>Retorno facturas</td>' +
-        '<td class="num">—</td><td class="num">$0.00</td>' +
-        '<td class="num" style="color:var(--amber);font-style:normal;font-weight:700">' + fmtMoney(ftz.resumen.capitalActivoActual) + ' activo</td>' +
-        '<td class="num">—</td>' +
-        '<td><span class="pill" style="background:' + hexToRgba("#7c93ad",0.18) + ';color:var(--text-muted)">' + escapeHtml(ftz.datosAl||"") + '</span></td></tr>';
+    function swLocalNetoPer(per){
+      var h = (backup.state.bonosLocalesHistorial||[]).find(function(x){ return x.per===per; });
+      if(!h) return null;
+      return { bruto:h.ing||0, cargos:h.car||0, neto:(h.ing||0)-(h.car||0) };
+    }
+    function pershingNetoPer(per){
+      var d = (backup.state.pershingHistorial||{})[per];
+      if(!d) return null;
+      var neto = d.ingresosNetos != null ? d.ingresosNetos : (d.ing||0)-(d.car||0);
+      return { bruto:d.ing||0, cargos:d.car||0, neto:neto };
+    }
+    function alquilerNetoPer(inm, costoMensual, per){
+      if(!inm) return null;
+      var a = (inm.alquileres||[]).find(function(x){ return x.per===per; });
+      if(!a) return null;
+      return { bruto:a.monto||0, cargos:costoMensual, neto:(a.monto||0)-costoMensual };
     }
 
-    els.flujoTableBody.innerHTML = html;
+    if(flujoVista === "anual") renderFlujoAnual(); else renderFlujoPeriodico();
 
-    var mesesConDatos = Math.max(swAnio.meses, peAnio.meses, 1);
-    var promedioMensual = totNeto / mesesConDatos;
+    function renderFlujoAnual(){
+      els.flujoTableTitle.textContent = "Resumen Anual de Ingresos al Bolsillo";
+      els.flujoTableHead.innerHTML = '<tr><th>Fuente</th><th>Tipo</th><th class="num">Réditos Brutos</th><th class="num">Cargos</th><th class="num">Neto en Bolsillo</th><th class="num">% Rédito</th><th>Período / Estado</th></tr>';
 
-    els.flujoKpis.innerHTML =
-      '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">INGRESO NETO ACUMULADO ' + escapeHtml(flujoAnioSel) + '</div><div class="value">' + fmtMoney(totNeto) + '</div><div class="foot">Al bolsillo, después de cargos, lo que va del año</div></div>' +
-      '<div class="summary-card" style="--accent:var(--blue)"><div class="label">PROMEDIO MENSUAL ' + escapeHtml(flujoAnioSel) + '</div><div class="value">' + fmtMoney(promedioMensual) + '</div><div class="foot">Neto acumulado / ' + mesesConDatos + ' mes(es) con datos</div></div>' +
-      '<div class="summary-card" style="--accent:var(--amber)"><div class="label">CUPONES SW LOCAL ' + escapeHtml(flujoAnioSel) + '</div><div class="value">' + fmtMoney(swAnio.bruto) + '</div><div class="foot">' + swAnio.meses + ' mes(es) cargados, lo que va del año</div></div>';
+      var swAnio = sumHistArrayPorAnio(backup.state.bonosLocalesHistorial, flujoAnioSel);
+      var peAnio = sumHistObjPorAnio(backup.state.pershingHistorial, flujoAnioSel);
+
+      function rowAcumulado(name, tipo, agg){
+        return { name:name, tipo:tipo, bruto:agg.bruto, cargos:agg.cargos, neto:agg.bruto-agg.cargos, per:agg.ultimoPer, meses:agg.meses };
+      }
+      function rowAlquilerAnual(name, inm, costoMensual){
+        var alquileresAnio = (inm && inm.alquileres || []).filter(function(a){ return a.per && a.per.slice(0,4)===flujoAnioSel; });
+        var bruto = alquileresAnio.reduce(function(s,a){ return s+(a.monto||0); },0);
+        var hoy = new Date();
+        var mesesTranscurridos = (String(hoy.getFullYear())===flujoAnioSel) ? (hoy.getMonth()+1) : 12;
+        var rentado = alquileresAnio.length > 0;
+        var cargos = rentado ? (costoMensual * mesesTranscurridos) : 0;
+        return { name:name, tipo:"Alquiler", bruto:bruto, cargos:cargos, neto: rentado ? (bruto-cargos) : null, per:null, pending:!rentado, estimadoCargos:true };
+      }
+
+      var rows = [
+        rowAcumulado("SW Local (bonos)", "Cupones", swAnio),
+        rowAcumulado("SW Pershing", "BlackRock + MM", peAnio),
+        rowAlquilerAnual("Hyde Park", apto, aptoCostoMensual),
+        rowAlquilerAnual("Local Sta. María", staMaria, staCostoMensual)
+      ];
+      if(globalMax){
+        rows.push({ name:"Global Max (" + (gmTasa*100).toFixed(1) + "%)", tipo:"Interés", bruto:gmInteresAnual, cargos:0, neto:gmInteresAnual, per:null, estimadoProyeccion:true });
+      }
+
+      var totBruto = rows.reduce(function(s,r){return s+r.bruto;},0);
+      var totCargos = rows.reduce(function(s,r){return s+r.cargos;},0);
+      var totNeto = rows.reduce(function(s,r){return s+(r.neto||0);},0);
+
+      var html = rows.map(function(r){
+        var badge;
+        if(r.pending){
+          badge = '<span class="pill" style="background:' + hexToRgba("#f59e0b",0.15) + ';color:#f59e0b">Sin alquiler registrado ' + escapeHtml(flujoAnioSel) + '</span>';
+        } else if(r.estimadoProyeccion){
+          badge = '<span class="pill" style="background:' + hexToRgba("#7c93ad",0.18) + ';color:var(--text-muted)">Proyección (capital × tasa anual)</span>';
+        } else if(r.estimadoCargos){
+          badge = '<span class="pill" style="background:' + hexToRgba("#7c93ad",0.18) + ';color:var(--text-muted)">Cargos estimados</span>';
+        } else {
+          badge = '<span class="pill" style="background:' + hexToRgba("#10b981",0.15) + ';color:#10b981">' + (r.meses||0) + ' meses · hasta ' + escapeHtml(r.per||"—") + '</span>';
+        }
+        var pctReditoRow = totBruto ? (r.bruto/totBruto*100) : 0;
+        return '<tr>' +
+          '<td class="name">' + escapeHtml(r.name) + '</td>' +
+          '<td>' + escapeHtml(r.tipo) + '</td>' +
+          '<td class="num">' + (r.bruto>0 ? fmtMoney(r.bruto) : "—") + '</td>' +
+          '<td class="num" style="color:' + (r.cargos>0?"var(--red)":"var(--text-muted)") + '">' + (r.cargos>0 ? "-"+fmtMoney(r.cargos) : "$0.00") + '</td>' +
+          '<td class="num" style="font-weight:700;color:' + (r.neto==null?"var(--text-muted)":(r.neto>=0?"var(--emerald)":"var(--red)")) + '">' + (r.neto==null?"—":fmtMoney(r.neto)) + '</td>' +
+          '<td class="num">' + (r.bruto>0 ? pctReditoRow.toFixed(1)+"%" : "—") + '</td>' +
+          '<td>' + badge + '</td>' +
+        '</tr>';
+      }).join("");
+
+      html += '<tr class="total-row"><td colspan="2" style="text-align:right">TOTAL NETO AL BOLSILLO ' + escapeHtml(flujoAnioSel) + '</td>' +
+        '<td class="num">' + fmtMoney(totBruto) + '</td>' +
+        '<td class="num" style="color:var(--red)">-' + fmtMoney(totCargos) + '</td>' +
+        '<td class="num" style="font-size:15px;color:' + (totNeto>=0?"var(--emerald)":"var(--red)") + '">' + fmtMoney(totNeto) + '</td>' +
+        '<td class="num">100.0%</td>' +
+        '<td></td></tr>';
+
+      if(ftz && ftz.resumen){
+        html += '<tr class="info-row"><td class="name" style="color:var(--text)">Fortesza (factoring)</td><td>Retorno facturas</td>' +
+          '<td class="num">—</td><td class="num">$0.00</td>' +
+          '<td class="num" style="color:var(--amber);font-style:normal;font-weight:700">' + fmtMoney(ftz.resumen.capitalActivoActual) + ' activo</td>' +
+          '<td class="num">—</td>' +
+          '<td><span class="pill" style="background:' + hexToRgba("#7c93ad",0.18) + ';color:var(--text-muted)">' + escapeHtml(ftz.datosAl||"") + '</span></td></tr>';
+      }
+
+      els.flujoTableBody.innerHTML = html;
+
+      var mesesConDatos = Math.max(swAnio.meses, peAnio.meses, 1);
+      var promedioMensual = totNeto / mesesConDatos;
+
+      els.flujoKpis.innerHTML =
+        '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">INGRESO NETO ACUMULADO ' + escapeHtml(flujoAnioSel) + '</div><div class="value">' + fmtMoney(totNeto) + '</div><div class="foot">Al bolsillo, después de cargos, lo que va del año</div></div>' +
+        '<div class="summary-card" style="--accent:var(--blue)"><div class="label">PROMEDIO MENSUAL ' + escapeHtml(flujoAnioSel) + '</div><div class="value">' + fmtMoney(promedioMensual) + '</div><div class="foot">Neto acumulado / ' + mesesConDatos + ' mes(es) con datos</div></div>' +
+        '<div class="summary-card" style="--accent:var(--amber)"><div class="label">CUPONES SW LOCAL ' + escapeHtml(flujoAnioSel) + '</div><div class="value">' + fmtMoney(swAnio.bruto) + '</div><div class="foot">' + swAnio.meses + ' mes(es) cargados, lo que va del año</div></div>';
+    }
+
+    function renderFlujoPeriodico(){
+      var esTrimestral = flujoVista === "trimestral";
+      els.flujoTableTitle.textContent = (esTrimestral?"Detalle Trimestral":"Detalle Mensual") + " de Ingresos al Bolsillo " + flujoAnioSel;
+      els.flujoTableHead.innerHTML = '<tr><th style="text-align:left">Período</th><th class="num">SW Local</th><th class="num">SW Pershing</th><th class="num">Hyde Park</th><th class="num">Sta. María</th><th class="num">Global Max (proy.)</th><th class="num">TOTAL</th></tr>';
+
+      var periodos;
+      if(esTrimestral){
+        var grupos = [["01","02","03"],["04","05","06"],["07","08","09"],["10","11","12"]];
+        periodos = grupos.map(function(g, qi){
+          return { label:"T" + (qi+1) + " " + flujoAnioSel, pers: g.map(function(mm){ return flujoAnioSel + "-" + mm; }) };
+        });
+      } else {
+        periodos = FLUJO_MESES.map(function(m, i){
+          return { label: m + " " + flujoAnioSel, pers: [flujoAnioSel + "-" + String(i+1).padStart(2,"0")] };
+        });
+      }
+      var gmPerPeriodo = esTrimestral ? round2(gmInteresAnual/4) : round2(gmInteresAnual/12);
+
+      function cell(has, val){
+        return "<td class='num' style='color:" + (has?(val>=0?"var(--emerald)":"var(--red)"):"var(--text-dim)") + "'>" + (has?fmtMoney(val):"—") + "</td>";
+      }
+
+      var totSw=0, totPe=0, totHp=0, totSm=0, totGm=0, totTotal=0;
+      var hoyMes = todayISO().slice(0,7);
+      var rowsHtml = periodos.map(function(p){
+        var swSum=0, peSum=0, hpSum=0, smSum=0, swHas=false, peHas=false, hpHas=false, smHas=false;
+        var futuro = true;
+        p.pers.forEach(function(per){
+          if(per <= hoyMes) futuro = false;
+          var s = swLocalNetoPer(per); if(s){ swSum+=s.neto; swHas=true; }
+          var pp = pershingNetoPer(per); if(pp){ peSum+=pp.neto; peHas=true; }
+          var hp = alquilerNetoPer(apto, aptoCostoMensual, per); if(hp){ hpSum+=hp.neto; hpHas=true; }
+          var sm = alquilerNetoPer(staMaria, staCostoMensual, per); if(sm){ smSum+=sm.neto; smHas=true; }
+        });
+        var gmVal = futuro ? 0 : gmPerPeriodo;
+        var total = (swHas?swSum:0)+(peHas?peSum:0)+(hpHas?hpSum:0)+(smHas?smSum:0)+gmVal;
+        totSw+=swHas?swSum:0; totPe+=peHas?peSum:0; totHp+=hpHas?hpSum:0; totSm+=smHas?smSum:0; totGm+=gmVal; totTotal+=total;
+        return "<tr><td style='text-align:left;font-weight:700;color:var(--text)'>" + escapeHtml(p.label) + "</td>" +
+          cell(swHas, swSum) + cell(peHas, peSum) + cell(hpHas, hpSum) + cell(smHas, smSum) +
+          "<td class='num' style='color:var(--text-muted)'>" + (futuro?"—":fmtMoney(gmVal)) + "</td>" +
+          "<td class='num' style='font-weight:700;color:" + (total>=0?"var(--emerald)":"var(--red)") + "'>" + fmtMoney(total) + "</td></tr>";
+      }).join("");
+
+      var totalRow = "<tr class='total-row'><td style='text-align:left'>TOTAL " + escapeHtml(flujoAnioSel) + "</td>" +
+        "<td class='num'>" + fmtMoney(totSw) + "</td>" + "<td class='num'>" + fmtMoney(totPe) + "</td>" +
+        "<td class='num'>" + fmtMoney(totHp) + "</td>" + "<td class='num'>" + fmtMoney(totSm) + "</td>" +
+        "<td class='num'>" + fmtMoney(totGm) + "</td>" +
+        "<td class='num' style='font-size:15px;color:" + (totTotal>=0?"var(--emerald)":"var(--red)") + "'>" + fmtMoney(totTotal) + "</td></tr>";
+
+      els.flujoTableBody.innerHTML = rowsHtml + totalRow;
+
+      els.flujoKpis.innerHTML =
+        '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">INGRESO NETO ' + escapeHtml(flujoAnioSel) + '</div><div class="value">' + fmtMoney(totTotal) + '</div><div class="foot">Al bolsillo, después de cargos, lo que va del año</div></div>' +
+        '<div class="summary-card" style="--accent:var(--blue)"><div class="label">PROMEDIO ' + (esTrimestral?"TRIMESTRAL":"MENSUAL") + '</div><div class="value">' + fmtMoney(totTotal/periodos.length) + '</div><div class="foot">Neto / ' + periodos.length + ' ' + (esTrimestral?"trimestres":"meses") + '</div></div>' +
+        '<div class="summary-card" style="--accent:var(--amber)"><div class="label">SW LOCAL ' + escapeHtml(flujoAnioSel) + '</div><div class="value">' + fmtMoney(totSw) + '</div><div class="foot">Cupones netos, lo que va del año</div></div>';
+    }
   }
 
   /* ---------- Sweetwater Local (bonos, renta fija) ---------- */
@@ -2771,6 +3003,7 @@
     }).join("");
     var total = "<tr class='matrix-total'><td>TOTAL ACTIVO</td><td>" + fmtMoney(totalValor) + "</td><td colspan='6'></td></tr>";
     els.swlBonosTable.innerHTML = head + rows + rowsPagados + total;
+    makeSortable(els.swlBonosTable);
   }
 
   function buildSwlFlujoTab(bonos, meses, hist, totalValor, periodosISO, cargosPorTipo, cuponesPorMes){
@@ -3395,6 +3628,7 @@
     var fTot = p.totalFondosMutuos || {};
     var fTotRow = "<tr class='matrix-total'><td>TOTAL FONDOS MUTUOS</td><td></td><td></td><td>" + fmtMoney(fTot.baseCosto) + "</td><td></td><td>" + fmtMoney(fTot.valorMkt) + "</td><td style='color:var(--emerald)'>+" + fmtMoney(fTot.gpNoReal) + "</td></tr>";
     els.swpFondosTable.innerHTML = fHead + fRows + fTotRow;
+    makeSortable(els.swpFondosTable);
 
     var bHead = "<tr><th style='text-align:left'>Instrumento</th><th>Cantidad</th><th>Costo Unit.</th><th>Base Costo</th><th>Precio Mkt</th><th>Valor Mkt</th><th>G/P No Real.</th><th>Int. Dev.</th><th>Tasa</th><th>Próx. Cupón</th></tr>";
     var bRows = (p.bonosCorp||[]).map(function(b){
@@ -3410,6 +3644,7 @@
     var bTot = p.totalBonosCorp || {};
     var bTotRow = "<tr class='matrix-total'><td>TOTAL BONOS</td><td>" + (bTot.cantidad||0).toLocaleString() + "</td><td></td><td>" + fmtMoney(bTot.baseCosto) + "</td><td></td><td>" + fmtMoney(bTot.valorMkt) + "</td><td style='color:var(--emerald)'>+" + fmtMoney(bTot.gpNoReal) + "</td><td style='color:var(--amber)'>" + fmtMoney(bTot.interesDevengado) + "</td><td></td><td></td></tr>";
     els.swpBonosTable.innerHTML = bHead + bRows + bTotRow;
+    makeSortable(els.swpBonosTable);
 
     var eHead = "<tr><th style='text-align:left'>ETF</th><th>Acciones</th><th>Costo Unit.</th><th>Base Costo</th><th>Precio Mkt</th><th>Valor Mkt</th><th>G/P No Real.</th></tr>";
     var eRows = (p.etfs||[]).map(function(e){
@@ -3420,6 +3655,7 @@
     var eTot = p.totalEtfs || {};
     var eTotRow = "<tr class='matrix-total'><td>TOTAL ETFs</td><td>" + (eTot.acciones||0).toLocaleString() + "</td><td></td><td>" + fmtMoney(eTot.baseCosto) + "</td><td></td><td>" + fmtMoney(eTot.valorMkt) + "</td><td style='color:var(--emerald)'>+" + fmtMoney(eTot.gpNoReal) + "</td></tr>";
     els.swpEtfsTable.innerHTML = eHead + eRows + eTotRow;
+    makeSortable(els.swpEtfsTable);
 
     var br = root.blackrock || {};
     els.swpBlackrockKpis.innerHTML =
@@ -3725,6 +3961,7 @@
         '<td><span class="pill" style="background:' + hexToRgba(stColorHex,0.15) + ';color:' + stColorHex + '">' + escapeHtml(statusLabel(a.status)) + '</span></td>' +
         '<td class="notes">' + escapeHtml(a.note || "—") + '</td></tr>';
     }).join("");
+    makeSortable(els.cryptoTableBody.closest("table"));
 
     fetchBinancePrice("BTCUSDT", "cryptoBtcCard");
     fetchBinancePrice("ETHUSDT", "cryptoEthCard");
@@ -3907,6 +4144,7 @@
       "</tr>";
     }).join("");
     els.binanceLiveTable.innerHTML = head + rows;
+    makeSortable(els.binanceLiveTable);
 
     var binanceInv = findInv("binance");
     var invertido = (binanceInv && binanceInv.valorInvertido != null) ? binanceInv.valorInvertido : (binanceInv ? binanceInv.value : null);
@@ -3946,7 +4184,7 @@
                     valorLabel:"Valor total de la cuenta", ingLabel:"Cambio de valor (Change value)", carLabel:"Cargos" },
     "otra_cuenta":{ label:"Otra cuenta (Bancos / Cripto / Liquidez)", kind:"generic-select",
                     valorLabel:"Saldo del período",   ingLabel:"Ingresos",                carLabel:"Cargos" },
-    "apto":       { label:"Apartamento (alquiler)",                kind:"inmueble",  inmuebleId:"apto",
+    "apto":       { label:"Hyde Park (alquiler)",                  kind:"inmueble",  inmuebleId:"apto",
                     valorLabel:null,                   ingLabel:"Canon de alquiler cobrado", carLabel:null },
     "sta_maria":  { label:"Local Sta. María (alquiler)",           kind:"inmueble",  inmuebleId:"sta_maria",
                     valorLabel:null,                   ingLabel:"Canon de alquiler cobrado", carLabel:null }
@@ -4694,7 +4932,9 @@
   }
 
   function renderCustomModulesNav(){
-    var mods = customModules();
+    // "profuturo" ya tiene enlaces propios a cada cuenta bajo Activos > Inversiones > Profuturo —
+    // no se duplica aquí. Cualquier OTRO módulo personalizado que se cree sí aparece en esta sección.
+    var mods = customModules().filter(function(m){ return m.id !== "profuturo"; });
     if(!mods.length){ els.navCustomModulesSection.style.display = "none"; return; }
     els.navCustomModulesSection.style.display = "block";
     els.navCustomModulesList.innerHTML = mods.map(function(m){
@@ -5546,6 +5786,18 @@
   /* ---------- sidebar nav ---------- */
   document.querySelectorAll(".nav-item").forEach(function(btn){
     btn.addEventListener("click", function(){
+      var openModalId = btn.getAttribute("data-open-modal");
+      var customCuenta = btn.getAttribute("data-custom-cuenta");
+      if(openModalId){
+        openModal(openModalId);
+        return;
+      }
+      if(customCuenta){
+        var parts = customCuenta.split(":");
+        currentCustomCuentaId = parts[1];
+        goPage("custom:" + parts[0]);
+        return;
+      }
       var navId = btn.getAttribute("data-nav");
       if(IMPLEMENTED_PAGES.indexOf(navId) !== -1){
         goPage(navId);
