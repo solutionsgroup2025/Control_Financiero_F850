@@ -373,7 +373,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 3 7v6c0 5 3.8 8.7 9 9 5.2-.3 9-4 9-9V7l-9-5Z"></path></svg>
         RL360
       </button>
-      <button class="nav-item sub" data-open-modal="interactive">
+      <button class="nav-item sub" data-nav="interactive-broker">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8M21 7v6M21 7h-6"></path></svg>
         Interactive Broker
       </button>
@@ -407,6 +407,18 @@
       <button class="nav-item" data-nav="jubilacion">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5Z"></path><path d="M6 12v5c0 1.5 2.7 3 6 3s6-1.5 6-3v-5"></path></svg>
         Jubilación
+      </button>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">Solution Group</div>
+      <button class="nav-item" data-nav="solution-group">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M9 8h6M9 12h6M9 16h3"></path></svg>
+        Solution Group
+      </button>
+      <button class="nav-item sub" data-nav="dividend-plan">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+        Distribución de Dividendos
       </button>
     </div>
 
@@ -712,6 +724,28 @@
             <thead><tr><th>Nombre</th><th>Categoría</th><th class="num">Valor Actual</th><th>Estado</th><th>Notas</th></tr></thead>
             <tbody id="cryptoTableBody"></tbody>
           </table>
+        </div>
+      </div>
+
+      <div class="page" id="page-interactive-broker">
+        <div class="table-card" style="padding:20px 22px;margin-bottom:16px;">
+          <div class="table-card-head" style="margin-bottom:4px;">
+            <h3>📈 Interactive Broker — Holdings en Vivo</h3>
+            <button class="btn btn-primary" id="btnSyncInteractive">↻ Sincronizar con Twelve Data</button>
+          </div>
+          <p class="sub" style="margin:0 0 12px;" id="interactiveLiveStatus">Sin datos todavía — ingresa las cantidades de acciones abajo y pulsa "Sincronizar con Twelve Data".</p>
+          <div class="kpi-grid-3" id="interactiveLiveKpis" style="margin-bottom:16px;"></div>
+          <div class="matrix-wrap"><table class="matrix" id="interactiveLiveTable" style="font-size:12.5px;"></table></div>
+          <div style="margin-top:10px;"><button type="button" class="btn btn-secondary" id="btnOpenInteractiveLedger" style="padding:5px 10px;font-size:12px;">Ver movimientos / aportes registrados</button></div>
+        </div>
+
+        <div class="table-card" style="padding:20px 22px;">
+          <div class="table-card-head" style="margin-bottom:4px;">
+            <h3>Fluctuación de Precio</h3>
+            <select class="dp-select" id="interactiveChartSymbol"></select>
+          </div>
+          <p class="sub" style="margin:0 0 14px;" id="interactiveChartSub">Últimos precios de cierre diarios.</p>
+          <div class="chart-svg-wrap" id="interactiveChartWrap" style="position:relative;"></div>
         </div>
       </div>
 
@@ -1307,6 +1341,7 @@
     "inmuebles": { title:"Bienes Inmuebles", sub:"Apartamento y Local Sta. María · Gastos y alquileres" },
     "solution-group": { title:"Solution Group", sub:"Extracción corporativa · Gastos deducibles, rebates y dividendos hacia la familia" },
     "dividend-plan": { title:"Proyección y Distribución de Dividendos", sub:"Planificación y ejecución de la distribución familiar de dividendos" },
+    "interactive-broker": { title:"Interactive Broker", sub:"Holdings VOO/QQQM en vivo — precio, cambio y fluctuación histórica" },
     "cripto": { title:"Cripto", sub:"Spot · Precios en tiempo real vía Binance" },
     "config": { title:"Configuración", sub:"API key de IA e importador de estados de cuenta" },
     "users": { title:"Usuarios y Actividad", sub:"Quién tiene acceso al tablero y quién ha hecho cambios" },
@@ -1388,6 +1423,14 @@
     binanceLiveKpis: document.getElementById("binanceLiveKpis"),
     binanceLiveTable: document.getElementById("binanceLiveTable"),
     btnSyncBinance: document.getElementById("btnSyncBinance"),
+    interactiveLiveStatus: document.getElementById("interactiveLiveStatus"),
+    interactiveLiveKpis: document.getElementById("interactiveLiveKpis"),
+    interactiveLiveTable: document.getElementById("interactiveLiveTable"),
+    btnSyncInteractive: document.getElementById("btnSyncInteractive"),
+    btnOpenInteractiveLedger: document.getElementById("btnOpenInteractiveLedger"),
+    interactiveChartSymbol: document.getElementById("interactiveChartSymbol"),
+    interactiveChartSub: document.getElementById("interactiveChartSub"),
+    interactiveChartWrap: document.getElementById("interactiveChartWrap"),
     cfgApiKey: document.getElementById("cfgApiKey"),
     btnSaveApiKey: document.getElementById("btnSaveApiKey"),
     btnClearApiKey: document.getElementById("btnClearApiKey"),
@@ -4702,6 +4745,126 @@
     updateBinanceKeyStatus();
     showToast("API key de Binance eliminada.");
   });
+  els.btnOpenInteractiveLedger.addEventListener("click", function(){ openModal("interactive"); });
+
+  var INTERACTIVE_SYMBOLS = ["VOO", "QQQM"];
+
+  function getInteractiveHoldings(){
+    return (backup.state.interactiveBroker && backup.state.interactiveBroker.holdings) || {};
+  }
+
+  function fetchStockQuotes(symbols){
+    return fetch("/api/stock-quotes?symbols=" + encodeURIComponent(symbols.join(","))).then(function(res){
+      return res.json().then(function(body){
+        if(!res.ok) throw new Error(body.error || ("HTTP " + res.status));
+        return body;
+      });
+    }).then(function(body){ return body.quotes || {}; });
+  }
+
+  function syncInteractiveLive(){
+    if(!els.interactiveLiveStatus) return;
+    els.interactiveLiveStatus.textContent = "Sincronizando con Twelve Data…";
+    fetchStockQuotes(INTERACTIVE_SYMBOLS).then(function(quotes){
+      if(!backup.state.interactiveBroker) backup.state.interactiveBroker = { holdings: {} };
+      backup.state.interactiveBroker.quotes = quotes;
+      backup.state.interactiveBroker.syncedAt = new Date().toISOString();
+      setDirty(true);
+      renderInteractiveBroker();
+      showToast("Interactive Broker sincronizado.");
+    }).catch(function(err){
+      els.interactiveLiveStatus.textContent = "Error al sincronizar: " + err.message;
+    });
+  }
+
+  function pctCellIB(v){
+    if(v==null || isNaN(v)) return "<td>—</td>";
+    return "<td style='color:" + (v>=0?"var(--emerald)":"var(--red)") + "'>" + (v>=0?"+":"") + v.toFixed(2) + "%</td>";
+  }
+
+  function renderInteractiveBroker(){
+    if(!els.interactiveLiveTable) return;
+    var ib = backup.state.interactiveBroker || {};
+    var holdings = ib.holdings || {};
+    var quotes = ib.quotes || {};
+
+    var head = "<tr><th style='text-align:left'>Activo</th><th>Cantidad</th><th>Precio Actual</th><th>Valor Actual</th><th>1D</th><th>1W</th><th>1M</th><th>1Y</th></tr>";
+    var totalActual = 0;
+    var rows = INTERACTIVE_SYMBOLS.map(function(sym){
+      var qty = parseFloat(holdings[sym]) || 0;
+      var q = quotes[sym] || {};
+      var valor = qty * (q.price || 0);
+      totalActual += valor;
+      var qtyCell = "<td><input type='number' step='0.0001' min='0' class='ib-qty-input' data-symbol=\"" + sym + "\" value=\"" + (holdings[sym] != null ? holdings[sym] : "") + "\" placeholder='0' style='width:90px;'></td>";
+      return "<tr><td style='text-align:left;font-weight:700;color:var(--text)'>" + escapeHtml(sym) + "</td>" +
+        qtyCell +
+        "<td>" + (q.price!=null ? fmtMoney(q.price) : "—") + "</td>" +
+        "<td style='font-weight:700;'>" + fmtMoney(valor) + "</td>" +
+        pctCellIB(q.ch1d) + pctCellIB(q.ch1w) + pctCellIB(q.ch1m) + pctCellIB(q.ch1y) +
+      "</tr>";
+    }).join("");
+    els.interactiveLiveTable.innerHTML = head + rows;
+
+    els.interactiveLiveTable.querySelectorAll(".ib-qty-input").forEach(function(inp){
+      inp.addEventListener("change", function(){
+        var sym = inp.getAttribute("data-symbol");
+        if(!backup.state.interactiveBroker) backup.state.interactiveBroker = { holdings: {} };
+        if(!backup.state.interactiveBroker.holdings) backup.state.interactiveBroker.holdings = {};
+        backup.state.interactiveBroker.holdings[sym] = parseFloat(inp.value) || 0;
+        setDirty(true);
+        renderInteractiveBroker();
+      });
+    });
+
+    els.interactiveLiveKpis.innerHTML =
+      '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">VALOR ACTUAL</div><div class="value">' + fmtMoney(totalActual) + '</div><div class="foot">' + INTERACTIVE_SYMBOLS.length + ' activos</div></div>' +
+      '<div class="summary-card" style="--accent:var(--blue)"><div class="label">ÚLTIMA SINCRONIZACIÓN</div><div class="value" style="font-size:15px;">' + (ib.syncedAt ? new Date(ib.syncedAt).toLocaleString("es-PA") : "—") + '</div></div>';
+
+    if(ib.syncedAt){
+      els.interactiveLiveStatus.textContent = "Última sincronización: " + new Date(ib.syncedAt).toLocaleString("es-PA") + " · Precios de Twelve Data (retraso de mercado según su plan gratuito).";
+    }
+
+    renderInteractiveChartSelect(quotes);
+  }
+
+  function renderInteractiveChartSelect(quotes){
+    var current = els.interactiveChartSymbol.value || INTERACTIVE_SYMBOLS[0];
+    els.interactiveChartSymbol.innerHTML = INTERACTIVE_SYMBOLS.map(function(sym){
+      return "<option value='" + sym + "'" + (sym===current?" selected":"") + ">" + sym + "</option>";
+    }).join("");
+    renderInteractiveChart(quotes);
+  }
+
+  function downsampleHist(hist, maxPoints){
+    if(hist.length <= maxPoints) return hist;
+    var out = [];
+    var step = (hist.length - 1) / (maxPoints - 1);
+    for(var i=0; i<maxPoints; i++){
+      out.push(hist[Math.round(i*step)]);
+    }
+    return out;
+  }
+
+  function renderInteractiveChart(quotes){
+    quotes = quotes || (backup.state.interactiveBroker && backup.state.interactiveBroker.quotes) || {};
+    var sym = els.interactiveChartSymbol.value || INTERACTIVE_SYMBOLS[0];
+    var q = quotes[sym];
+    if(!q || !q.series || !q.series.length){
+      els.interactiveChartWrap.innerHTML = '<div class="mv-empty">Sin datos históricos todavía — sincroniza primero.</div>';
+      els.interactiveChartSub.textContent = "Últimos precios de cierre diarios.";
+      return;
+    }
+    var hist = q.series.map(function(pt){ return { value: pt.close, label: pt.date }; });
+    hist = downsampleHist(hist, 40);
+    var built = buildLineChartSvg(hist, "#3b82f6");
+    els.interactiveChartWrap.innerHTML = built.svg;
+    if(built.meta) attachChartTooltip(els.interactiveChartWrap, built.meta, "#3b82f6");
+    els.interactiveChartSub.textContent = sym + " · " + hist.length + " cierres (muestreados) · último: " + fmtMoney(hist[hist.length-1].value);
+  }
+
+  els.interactiveChartSymbol.addEventListener("change", function(){ renderInteractiveChart(); });
+  els.btnSyncInteractive.addEventListener("click", syncInteractiveLive);
+
   if(els.btnSyncBinance) els.btnSyncBinance.addEventListener("click", syncBinanceLive);
 
   function extractPdfText(file){
@@ -6230,7 +6393,7 @@
   });
 
   /* ---------- page router ---------- */
-  var IMPLEMENTED_PAGES = ["resumen","jubilacion","sw-local","sw-pershing","rl360","fortesza","inmuebles","solution-group","dividend-plan","cripto","config","users","hipotecas","notas","module-admin","tesoreria"];
+  var IMPLEMENTED_PAGES = ["resumen","jubilacion","sw-local","sw-pershing","rl360","fortesza","inmuebles","solution-group","dividend-plan","interactive-broker","cripto","config","users","hipotecas","notas","module-admin","tesoreria"];
   function goPage(id){
     var isCustom = id.indexOf("custom:") === 0;
     if(!isCustom && IMPLEMENTED_PAGES.indexOf(id) === -1) return;
@@ -6260,6 +6423,7 @@
       else if(id === "inmuebles") renderInmuebles();
       else if(id === "solution-group") renderSolutionGroup();
       else if(id === "dividend-plan") renderDividendPlan();
+      else if(id === "interactive-broker") renderInteractiveBroker();
       else if(id === "cripto") renderCripto();
       else if(id === "config") renderConfig();
       else if(id === "users") renderUsersActivity();
