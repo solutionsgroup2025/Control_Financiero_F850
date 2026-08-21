@@ -857,6 +857,12 @@
           <p class="sub" style="margin:0 0 14px;">Quién guardó cambios y cuándo — últimos 100 registros.</p>
           <div class="matrix-wrap"><table class="matrix" id="activityLogTable" style="font-size:12.5px;"></table></div>
         </div>
+
+        <div class="table-card" style="padding:20px 22px;margin-top:16px;">
+          <h3 style="margin:0 0 4px;">Historial de Versiones</h3>
+          <p class="sub" style="margin:0 0 14px;">Cada guardado queda registrado aquí — puedes ver qué cambió y revertir a una versión anterior si es necesario.</p>
+          <div class="matrix-wrap"><table class="matrix" id="versionsTable" style="font-size:12.5px;"></table></div>
+        </div>
       </div>
 
       <div class="page" id="page-solution-group">
@@ -1121,6 +1127,25 @@
     <div class="modal-body">
       <div id="customDetailCampos"></div>
       <div id="customDetailComposicion" style="margin-top:16px;"></div>
+    </div>
+  </div>
+</div>
+
+<div id="versionDiffOverlay" class="overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <h2 id="versionDiffTitle">Detalle de la versión</h2>
+        <div class="sub" id="versionDiffSub"></div>
+      </div>
+      <button class="close-btn" id="versionDiffClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="versionDiffBody"></div>
+    </div>
+    <div class="modal-form" style="border-top:none;display:flex;justify-content:flex-end;gap:10px;">
+      <button class="btn" id="btnCancelRestore" type="button">Cerrar</button>
+      <button class="btn btn-primary" id="btnConfirmRestore" type="button">Revertir a esta versión</button>
     </div>
   </div>
 </div>
@@ -1490,6 +1515,13 @@
     usersTable: document.getElementById("usersTable"),
     btnAddUser: document.getElementById("btnAddUser"),
     activityLogTable: document.getElementById("activityLogTable"),
+    versionsTable: document.getElementById("versionsTable"),
+    versionDiffOverlay: document.getElementById("versionDiffOverlay"),
+    versionDiffSub: document.getElementById("versionDiffSub"),
+    versionDiffBody: document.getElementById("versionDiffBody"),
+    versionDiffClose: document.getElementById("versionDiffClose"),
+    btnCancelRestore: document.getElementById("btnCancelRestore"),
+    btnConfirmRestore: document.getElementById("btnConfirmRestore"),
     overlay: document.getElementById("overlay"),
     btnClose: document.getElementById("btnClose"),
     modalTitle: document.getElementById("modalTitle"),
@@ -1647,15 +1679,22 @@
 
     Promise.all([
       supa.from("allowed_users").select("email,nombre,role,active,added_at").order("added_at", { ascending: true }),
-      supa.from("activity_log").select("user_email,action,created_at").order("created_at", { ascending: false }).limit(200)
+      supa.from("activity_log").select("user_email,action,created_at").order("created_at", { ascending: false }).limit(200),
+      supa.from("app_state_versions").select("id,user_email,action,created_at").order("created_at", { ascending: false }).limit(100)
     ]).then(function(results){
-      var usersRes = results[0], logRes = results[1];
+      var usersRes = results[0], logRes = results[1], versionsRes = results[2];
       if(usersRes.error) throw usersRes.error;
       if(logRes.error) throw logRes.error;
       var lastSeen = {};
       (logRes.data||[]).forEach(function(r){ if(!lastSeen[r.user_email]) lastSeen[r.user_email] = r.created_at; });
       buildUsersTable(usersRes.data || [], lastSeen);
       buildActivityLogTable((logRes.data||[]).slice(0,100));
+      if(versionsRes.error){
+        console.error("Versions load error:", versionsRes.error);
+        els.versionsTable.innerHTML = "<tr><td style='text-align:center;color:var(--text-dim);padding:18px;'>No se pudo cargar el historial de versiones.</td></tr>";
+      } else {
+        buildVersionsTable(versionsRes.data || []);
+      }
     }).catch(function(err){
       els.usersTable.innerHTML = "<tr><td style='text-align:center;color:var(--text-dim);padding:18px;'>No se pudo cargar la lista de usuarios.</td></tr>";
       els.activityLogTable.innerHTML = "<tr><td style='text-align:center;color:var(--text-dim);padding:18px;'>No se pudo cargar la bitácora.</td></tr>";
@@ -1773,6 +1812,116 @@
     }).join("");
     els.activityLogTable.innerHTML = head + (body || "<tr><td colspan='3' style='text-align:center;color:var(--text-dim);padding:18px;'>Sin actividad registrada todavía.</td></tr>");
   }
+
+  /* ---------- Historial de Versiones ---------- */
+  function buildVersionsTable(rows){
+    var head = "<tr><th style='text-align:left'>Fecha</th><th style='text-align:left'>Usuario</th><th style='text-align:left'>Acción</th><th></th></tr>";
+    var body = rows.map(function(r){
+      var d = new Date(r.created_at);
+      var fecha = isNaN(d.getTime()) ? r.created_at : d.toLocaleString("es-PA",{year:"numeric",month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"});
+      return "<tr>" +
+        "<td style='text-align:left;color:var(--text-muted)'>" + escapeHtml(fecha) + "</td>" +
+        "<td style='text-align:left;font-weight:600'>" + escapeHtml(r.user_email || "—") + "</td>" +
+        "<td style='text-align:left;color:var(--text-muted)'>" + escapeHtml(r.action || "update") + "</td>" +
+        "<td style='white-space:nowrap'><button type='button' class='btn btn-secondary version-view' data-id=\"" + r.id + "\" style='padding:4px 9px;font-size:11px;'>Ver detalle</button></td>" +
+      "</tr>";
+    }).join("");
+    els.versionsTable.innerHTML = head + (body || "<tr><td colspan='4' style='text-align:center;color:var(--text-dim);padding:18px;'>Sin versiones registradas todavía.</td></tr>");
+
+    els.versionsTable.querySelectorAll(".version-view").forEach(function(btn){
+      btn.addEventListener("click", function(){ openVersionDiff(btn.getAttribute("data-id")); });
+    });
+  }
+
+  function diffStates(oldData, newData, path){
+    path = path || "";
+    var changes = [];
+    var a = oldData || {}, b = newData || {};
+    var keys = {};
+    Object.keys(a).forEach(function(k){ keys[k]=1; });
+    Object.keys(b).forEach(function(k){ keys[k]=1; });
+    Object.keys(keys).forEach(function(key){
+      var fullPath = path ? (path + "." + key) : key;
+      var av = a[key], bv = b[key];
+      var aIsObj = av && typeof av === "object" && !Array.isArray(av);
+      var bIsObj = bv && typeof bv === "object" && !Array.isArray(bv);
+      if(aIsObj && bIsObj){
+        changes = changes.concat(diffStates(av, bv, fullPath));
+      } else if(JSON.stringify(av) !== JSON.stringify(bv)){
+        changes.push({ campo: fullPath, antes: av, despues: bv });
+      }
+    });
+    return changes;
+  }
+
+  var _versionDiffTarget = null;
+
+  function openVersionDiff(versionId){
+    els.versionDiffBody.innerHTML = "<p style='color:var(--text-dim);'>Cargando…</p>";
+    els.versionDiffSub.textContent = "";
+    els.versionDiffOverlay.classList.add("show");
+    _versionDiffTarget = null;
+
+    supa.from("app_state_versions").select("id,data,user_email,created_at").eq("id", versionId).maybeSingle()
+      .then(function(res){
+        if(res.error) throw res.error;
+        if(!res.data){ els.versionDiffBody.innerHTML = "<p>Versión no encontrada.</p>"; return; }
+        var d = new Date(res.data.created_at);
+        var fecha = isNaN(d.getTime()) ? res.data.created_at : d.toLocaleString("es-PA",{year:"numeric",month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"});
+        els.versionDiffSub.textContent = "Guardada el " + fecha + " por " + (res.data.user_email || "—");
+
+        var changes = diffStates(res.data.data, backup);
+        if(!changes.length){
+          els.versionDiffBody.innerHTML = "<p style='color:var(--text-dim);'>Sin diferencias detectables contra el estado actual.</p>";
+        } else {
+          var rows = changes.map(function(c){
+            return "<tr>" +
+              "<td style='text-align:left;font-weight:600'>" + escapeHtml(c.campo) + "</td>" +
+              "<td style='text-align:left;color:var(--red)'>" + escapeHtml(JSON.stringify(c.antes)) + "</td>" +
+              "<td style='text-align:left;color:var(--emerald)'>" + escapeHtml(JSON.stringify(c.despues)) + "</td>" +
+            "</tr>";
+          }).join("");
+          els.versionDiffBody.innerHTML =
+            "<p class='sub' style='margin-bottom:10px;'>Comparado contra el estado actual (" + changes.length + " cambio" + (changes.length===1?"":"s") + "):</p>" +
+            "<div class='matrix-wrap'><table class='matrix' style='font-size:12.5px;'>" +
+            "<tr><th style='text-align:left'>Campo</th><th style='text-align:left'>Antes (versión)</th><th style='text-align:left'>Ahora (actual)</th></tr>" +
+            rows + "</table></div>";
+        }
+        _versionDiffTarget = versionId;
+      })
+      .catch(function(err){
+        console.error("Version diff error:", err);
+        els.versionDiffBody.innerHTML = "<p style='color:var(--red)'>No se pudo cargar el detalle de la versión.</p>";
+      });
+  }
+
+  function closeVersionDiff(){
+    els.versionDiffOverlay.classList.remove("show");
+    _versionDiffTarget = null;
+  }
+
+  els.versionDiffClose.addEventListener("click", closeVersionDiff);
+  els.btnCancelRestore.addEventListener("click", closeVersionDiff);
+  els.versionDiffOverlay.addEventListener("click", function(e){ if(e.target === els.versionDiffOverlay) closeVersionDiff(); });
+  document.addEventListener("keydown", function(e){ if(e.key === "Escape" && els.versionDiffOverlay.classList.contains("show")) closeVersionDiff(); });
+
+  els.btnConfirmRestore.addEventListener("click", function(){
+    if(!_versionDiffTarget) return;
+    if(!confirm("¿Revertir el portafolio a esta versión? Se guardará el estado actual antes de revertir, así que también podrás deshacer esto si hace falta.")) return;
+    els.btnConfirmRestore.disabled = true;
+    supa.rpc("restore_app_state_version", { p_version_id: _versionDiffTarget })
+      .then(function(res){
+        if(res.error) throw res.error;
+        showToast("Portafolio revertido correctamente. Recargando…");
+        closeVersionDiff();
+        setTimeout(function(){ location.reload(); }, 1200);
+      })
+      .catch(function(err){
+        console.error("Restore error:", err);
+        showToast("No se pudo revertir: " + (err.message || "error desconocido"));
+        els.btnConfirmRestore.disabled = false;
+      });
+  });
 
   els.btnAddUser.addEventListener("click", function(){
     if(!currentUserIsAdmin) return;
