@@ -1048,7 +1048,8 @@
           </div>
           <div class="table-card">
             <div class="table-card-head"><h3>Historial Mensual</h3></div>
-            <table>
+            <div class="month-bar" id="customHistYearSelector" style="padding:0 20px 14px;"></div>
+            <table class="matrix">
               <thead><tr id="customHistHead"></tr></thead>
               <tbody id="customHistTableBody"></tbody>
             </table>
@@ -1565,6 +1566,7 @@
     customLineChartWrap: document.getElementById("customLineChartWrap"),
     customComposicion: document.getElementById("customComposicion"),
     customHistHead: document.getElementById("customHistHead"),
+    customHistYearSelector: document.getElementById("customHistYearSelector"),
     customHistTableBody: document.getElementById("customHistTableBody"),
     customDetailOverlay: document.getElementById("customDetailOverlay"),
     customDetailClose: document.getElementById("customDetailClose"),
@@ -4686,6 +4688,15 @@
   }
 
   /* ---------- Motor de ingesta acumulativa multiactivo ---------- */
+  // vínculo entre una cuenta de módulo personalizado (Profuturo, etc.) y su fila correspondiente
+  // en la Tabla General de Inversiones — sin esto, el resumen general queda desactualizado
+  // aunque el historial del módulo personalizado sí se guarde bien.
+  var CUSTOM_CUENTA_INVESTMENT_LINK = {
+    "profuturo:edson": "prof_edson",
+    "profuturo:diego": "prof_diego",
+    "profuturo:isabella": "prof_isabella"
+  };
+
   var MODULE_TARGETS = {
     "sw-local":   { label:"Sweetwater Local (bonos)",              kind:"sw-local-bonos", investmentId:"sweetwater",
                     valorLabel:"Total del período",   ingLabel:"Cupones cobrados",        carLabel:"Cargos" },
@@ -5468,6 +5479,11 @@
         composicion: (function(){ var rows = collectComposicionRows(); return rows != null ? rows : (existingC ? existingC.composicion : undefined); })()
       };
       if(existingC){ Object.assign(existingC, entryC); } else { ccuenta.historial.push(entryC); }
+      var linkedInvId = CUSTOM_CUENTA_INVESTMENT_LINK[parts[1] + ":" + parts[2]];
+      if(linkedInvId){
+        var linkedInv = findInv(linkedInvId);
+        if(linkedInv && entryC.total != null) linkedInv.value = entryC.total;
+      }
       setDirty(true);
       logIngest({ ts: new Date().toISOString(), modulo: cmod.label + " — " + ccuenta.nombre, periodo: cper, resumen: fmtMoney(entryC.total) + " total" });
       els.ivPeriodo.value = ""; els.ivValorTotal.value = ""; els.ivIngresos.value = ""; els.ivCargos.value = ""; els.ivNotas.value = "";
@@ -5909,20 +5925,53 @@
       els.customComposicion.innerHTML = '<div class="mv-empty">Sin desglose para este período.</div>';
     }
 
-    var headCols = ["Período", "Total"].concat(camposKeys);
-    els.customHistHead.innerHTML = headCols.map(function(c,i){
-      return '<th' + (i>=1?' class="num"':'') + '>' + escapeHtml(c) + '</th>';
+    buildCustomHistorialTab(mod, cuenta, hist);
+  }
+
+  var customHistYear = null;
+
+  function buildCustomHistorialTab(mod, cuenta, hist){
+    var years = Array.from(new Set(hist.map(function(h){ return h.per.slice(0,4); }))).sort(function(a,b){ return b.localeCompare(a); });
+    if(!years.length) years = [String(new Date().getFullYear())];
+    if(!customHistYear || years.indexOf(customHistYear) === -1) customHistYear = years[0];
+
+    els.customHistYearSelector.innerHTML = years.map(function(y){
+      return '<button class="month-btn' + (y===customHistYear?' on':'') + '" data-year="' + y + '">' + y + '</button>';
+    }).join("");
+    els.customHistYearSelector.querySelectorAll(".month-btn").forEach(function(btn){
+      btn.addEventListener("click", function(){ customHistYear = btn.getAttribute("data-year"); buildCustomHistorialTab(mod, cuenta, hist); });
+    });
+
+    els.customHistHead.innerHTML = "<th style='text-align:left'>Período</th><th>Total</th><th>Ingresos</th><th>Cargos</th><th>Total Neto</th><th>% Rendimiento</th>";
+
+    var filtered = hist.filter(function(h){ return h.per.slice(0,4) === customHistYear; });
+    var sortedDesc = filtered.slice().sort(function(a,b){ return a.per<b.per?1:-1; });
+    var rows = sortedDesc.map(function(h){
+      var ing = (h.campos && h.campos["Ingresos"]) || 0;
+      var car = (h.campos && h.campos["Cargos"]) || 0;
+      var neto = ing - car;
+      var rendPct = h.total ? (neto/h.total*100) : 0;
+      return "<tr data-per='" + h.per + "'><td style='text-align:left'>" + escapeHtml(monthLabel(h.per)) + "</td>" +
+        "<td>" + fmtMoney(h.total) + "</td>" +
+        "<td style='color:var(--emerald)'>" + (ing>0?fmtMoney(ing):"—") + "</td>" +
+        "<td style='color:" + (car>0?"var(--red)":"var(--text-dim)") + "'>" + (car>0?fmtMoney(car):"—") + "</td>" +
+        "<td style='color:" + (neto>=0?"var(--emerald)":"var(--red)") + ";font-weight:700'>" + (neto>=0?"+":"") + fmtMoney(neto) + "</td>" +
+        "<td style='color:" + swlRendColor(rendPct) + ";font-weight:700'>" + rendPct.toFixed(2) + "%</td></tr>";
     }).join("");
 
-    els.customHistTableBody.innerHTML = hist.slice().reverse().map(function(h){
-      var cells = '<td class="name">' + escapeHtml(monthLabel(h.per)) + '</td><td class="num">' + fmtMoney(h.total) + '</td>';
-      camposKeys.forEach(function(k){
-        var v = (h.campos && h.campos[k]) || 0;
-        cells += '<td class="num" style="color:' + (v<0?"var(--red)":"var(--text-muted)") + '">' + fmtMoney(v) + '</td>';
-      });
-      return '<tr data-per="' + h.per + '">' + cells + '</tr>';
-    }).join("");
-    els.customHistTableBody.querySelectorAll("tr").forEach(function(tr){
+    var totIng = filtered.reduce(function(s,h){ return s + ((h.campos && h.campos["Ingresos"]) || 0); }, 0);
+    var totCar = filtered.reduce(function(s,h){ return s + ((h.campos && h.campos["Cargos"]) || 0); }, 0);
+    var totNeto = totIng - totCar;
+    var totalBase = sortedDesc.length ? sortedDesc[0].total : 0;
+    var totRend = totalBase ? (totNeto/totalBase*100) : 0;
+    var totRow = "<tr class='matrix-total'><td>TOTAL " + escapeHtml(customHistYear) + "</td><td></td>" +
+      "<td style='color:var(--emerald)'>" + fmtMoney(totIng) + "</td>" +
+      "<td style='color:var(--red)'>" + fmtMoney(totCar) + "</td>" +
+      "<td style='color:" + (totNeto>=0?"var(--emerald)":"var(--red)") + "'>" + (totNeto>=0?"+":"") + fmtMoney(totNeto) + "</td>" +
+      "<td style='color:" + swlRendColor(totRend) + "'>" + totRend.toFixed(2) + "%</td></tr>";
+
+    els.customHistTableBody.innerHTML = (rows || "<tr><td colspan='6' style='text-align:center;color:var(--text-dim);padding:18px;'>Sin registros para " + escapeHtml(customHistYear) + ".</td></tr>") + totRow;
+    els.customHistTableBody.querySelectorAll("tr[data-per]").forEach(function(tr){
       tr.addEventListener("click", function(){ openCustomDetail(mod, cuenta, tr.getAttribute("data-per")); });
     });
   }
