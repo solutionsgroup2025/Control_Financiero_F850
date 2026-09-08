@@ -5270,6 +5270,8 @@
       els.ivIngresos.value = round2((obj.ingresos||0) + (obj.distribucionBlackRock||0));
     }
     if(obj.cargos != null) els.ivCargos.value = obj.cargos;
+    if(obj.egresos != null) els.ivEgresos.value = obj.egresos;
+    if(obj.intereses != null) els.ivIntereses.value = obj.intereses;
     if(obj.depositos != null && els.ivPershingDepositos) els.ivPershingDepositos.value = obj.depositos;
     // RL360: el campo "Ingresos" del formulario (MODULE_TARGETS lo etiqueta "Premios Invertidos Acumulados")
     // se llena con "premiosInvertidos" — el CAPITAL ACUMULADO que el propio estado de cuenta reporta (más
@@ -5473,6 +5475,12 @@
         var isPershing = els.importTarget.value === "sw-pershing";
         var isSwLocal = els.importTarget.value === "sw-local";
         var isRl360 = els.importTarget.value === "rl360";
+        var isAhorro = (function(){
+          var v = els.importTarget.value;
+          if(v.indexOf("customcuenta:") !== 0) return false;
+          var m = findCustomModule(v.split(":")[1]);
+          return !!(m && m.tipo === "ahorro");
+        })();
         var promptText = isPershing
           ? "Este es el texto extraído de un estado de cuenta de Pershing/SweetWater (multi-activo: fondos mutuos, bonos corporativos, ETFs, y una posición BlackRock Private Credit Fund):\n\n" + pdfPreviewText +
             "\n\nEl documento típicamente tiene estas secciones — úsalas como guía para ubicar cada dato:\n" +
@@ -5541,6 +5549,23 @@
             "6. cargosLineas: arreglo con CADA cargo/comisión individual del \"Extracto de Transacciones\" en el periodo cubierto por este documento, con su descripción literal y monto, ej: [{\"descripcion\":\"Administration Charge\",\"monto\":45.20},{\"descripcion\":\"Establishment Charge\",\"monto\":38.50},{\"descripcion\":\"Servicing Charge\",\"monto\":5.00},{\"descripcion\":\"Financial Adviser Fee\",\"monto\":12.60}]. Si el documento cubre varios meses, suma cada tipo de cargo en un solo renglón por tipo. Si no encuentras esta sección, deja el arreglo vacío — NO inventes cargos ni cifras.\n" +
             "IMPORTANTE: usa el nombre EXACTO de cada fondo tal como aparece literalmente en el documento (debe coincidir mes a mes para poder comparar). No inventes fondos ni cifras — si un fondo no aparece este periodo, simplemente no lo incluyas. Verifica que total ≈ suma de composicion, y que premiosInvertidos + rendimiento ≈ total, antes de responder. Responde SOLO con JSON, sin texto adicional."
           + "\n\nEjemplo de formato esperado:\n{\"periodo\":\"2026-08\",\"numeroPoliza\":\"RS02017296\",\"total\":34514.52,\"premiosInvertidos\":25200,\"composicion\":{\"Guinness Global Innovators C Acc USD\":10117.80,\"BGF World Technology A2 Acc USD\":8393.60,\"Janus Henderson US Forty A Acc USD\":8356.77,\"Janus Henderson Global Life Sciences\":7646.35},\"cargosLineas\":[{\"descripcion\":\"Administration Charge\",\"monto\":45.20},{\"descripcion\":\"Establishment Charge\",\"monto\":38.50},{\"descripcion\":\"Servicing Charge\",\"monto\":5.00},{\"descripcion\":\"Financial Adviser Fee\",\"monto\":12.60}]}"
+          : isAhorro
+          ? "Este es el texto extraído de un estado de cuenta de una cuenta de ahorros/banco:\n\n" + pdfPreviewText +
+            "\n\nEsta es una cuenta de ahorros simple (no de inversión) — clasifica CADA línea de movimiento en una de 4 categorías, NUNCA las mezcles entre sí:\n" +
+            "- INTERESES: cualquier línea cuya descripción contenga la palabra \"INTERES\" o \"INTEREST\" (ej. \"INTERES CUENTA DE AHORROS\", \"INTERES GANADO\") — esto es SIEMPRE intereses, nunca ingresos genéricos, aunque aumente el saldo igual que un depósito.\n" +
+            "- CARGOS: comisiones, fees, o cargos del banco (ej. \"COMISION TRANSFERENCIA\", \"CARGO MANTENIMIENTO\", \"ITBMS\") — siempre restan del saldo.\n" +
+            "- EGRESOS: cualquier salida de dinero que NO sea un cargo/comisión bancaria (ej. transferencias enviadas, retiros, pagos) — resta del saldo.\n" +
+            "- INGRESOS: cualquier entrada de dinero que NO sea intereses (ej. depósitos, transferencias recibidas, pagos entrantes) — suma al saldo.\n" +
+            "\nExtrae:\n" +
+            "1. periodo (formato YYYY-MM, el mes de corte del estado de cuenta)\n" +
+            "2. total: \"Saldo final\" del periodo\n" +
+            "3. ingresos: suma de TODAS las líneas de depósitos/transferencias recibidas (categoría INGRESOS arriba), EXCLUYENDO intereses\n" +
+            "4. egresos: suma de TODAS las líneas de salidas de dinero que no sean cargos bancarios (categoría EGRESOS arriba)\n" +
+            "5. cargos: suma de comisiones/fees del banco (categoría CARGOS arriba)\n" +
+            "6. intereses: suma de TODAS las líneas que contengan \"INTERES\"/\"INTEREST\" (categoría INTERESES arriba) — NUNCA las incluyas también en \"ingresos\"\n" +
+            "7. ingresosLineas / egresosLineas / cargosLineas / interesesLineas: arreglos de {\"descripcion\":\"...\",\"monto\":0} con cada línea individual de esa categoría, con su descripción literal\n" +
+            "IMPORTANTE: verifica que Saldo inicial + ingresos + intereses − egresos − cargos ≈ Saldo final antes de responder. Si no cuadra, revisa si clasificaste mal alguna línea. NO inventes movimientos ni cifras — si una categoría no tiene líneas ese periodo, usa 0 y arreglo vacío. Responde SOLO con JSON, sin texto adicional." +
+            "\n\nEjemplo de formato esperado:\n{\"periodo\":\"2026-08\",\"total\":24745.26,\"ingresos\":24486.00,\"egresos\":0,\"cargos\":37.45,\"intereses\":5.82,\"ingresosLineas\":[{\"descripcion\":\"TRR09340854840 PAYPAL PRIVATE LIMITED\",\"monto\":485.00},{\"descripcion\":\"BANCA EN LINEA TRANSFERENCIA DE SOLUTIONS GROUP\",\"monto\":7000.00}],\"egresosLineas\":[],\"cargosLineas\":[{\"descripcion\":\"COMISION TRANSFERENCIA INTERNACIONAL RECIBIDA\",\"monto\":37.45}],\"interesesLineas\":[{\"descripcion\":\"INTERES CUENTA DE AHORROS\",\"monto\":5.82}]}"
           : "Este es el texto extraído de un estado de cuenta financiero:\n\n" + pdfPreviewText + "\n\nExtrae: periodo (formato YYYY-MM), saldo/valor total del periodo, ingresos/cupones/réditos/canon del periodo, y cargos/comisiones del periodo. " +
             "Además, si el documento trae detalle línea por línea de transacciones (ej. \"Cupón X\", \"COMISION\", \"ITBMS\", \"INTERES ACUMULADO\", cargos de custodia/manejo, etc.), inclúyelo en ingresosLineas y cargosLineas como arreglos de {\"descripcion\":\"...\",\"monto\":0} — una línea por cada transacción individual del período, con su descripción literal (ej. \"Cupón ALUT0875000527W\", \"Comisión compra\", \"ITBMS 7%\"). Si no hay detalle línea por línea disponible, omite estos dos campos. " +
             "Además, si el documento trae una tabla de composición/desglose por fondo, tipo de inversión, o tipo de saldo (ej. fondos de pensión con varias sub-cuentas como \"ProAhorro\", \"ProVisión\", \"ProCapital\", \"ProInversión\", o categorías tipo \"Patronal\"/\"Personal\"), inclúyelo en \"composicion\" como un objeto {\"nombre exacto de la categoría\":monto}, usando el nombre EXACTO tal como aparece en el documento (debe coincidir mes a mes para poder comparar). Si el documento trae MÁS DE UNA tabla de desglose (ej. por tipo de saldo Y por tipo de inversión), usa la de \"tipo de inversión\" o \"tipo de fondo\" (la que desglosa por fondo/instrumento, no por origen del aporte). Si no hay ninguna tabla de este tipo, omite el campo \"composicion\" — NO inventes categorías ni cifras. " +
