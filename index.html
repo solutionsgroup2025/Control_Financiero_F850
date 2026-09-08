@@ -264,11 +264,13 @@
     .charts-row{grid-template-columns:1fr;}
     .summary-grid{grid-template-columns:repeat(2,1fr);}
     .kpi-grid-3{grid-template-columns:repeat(2,1fr);}
+    .kpi-grid-4{grid-template-columns:repeat(2,1fr);}
   }
   @media (max-width:720px){
     .sidebar{display:none;}
     .summary-grid{grid-template-columns:1fr;}
     .kpi-grid-3{grid-template-columns:1fr;}
+    .kpi-grid-4{grid-template-columns:1fr;}
     .form-grid{grid-template-columns:1fr;}
   }
 
@@ -278,6 +280,7 @@
 
   /* ---------- cash flow / generic module extras ---------- */
   .kpi-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px;}
+  .kpi-grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px;}
   tbody tr.total-row{background:var(--panel-header);font-weight:800;}
   tbody tr.total-row td{color:var(--text);}
   tbody tr.info-row td{color:var(--text-muted);font-style:italic;}
@@ -581,6 +584,7 @@
       </div>
 
       <div class="page" id="page-sw-local">
+        <div class="kpi-grid-4" id="swlKpisCapital" style="margin-bottom:16px;"></div>
         <div class="kpi-grid-3" id="swlKpis"></div>
 
         <div class="table-card" style="padding:20px 22px;">
@@ -1397,6 +1401,7 @@
     flujoTableTitle: document.getElementById("flujoTableTitle"),
     flujoAnioSelector: document.getElementById("flujoAnioSelector"),
     flujoVistaSelector: document.getElementById("flujoVistaSelector"),
+    swlKpisCapital: document.getElementById("swlKpisCapital"),
     swlKpis: document.getElementById("swlKpis"),
     swlBonosTable: document.getElementById("swlBonosTable"),
     swlFlujoTable: document.getElementById("swlFlujoTable"),
@@ -3249,6 +3254,13 @@
     return porTipo;
   }
 
+  // heurística: los instrumentos de Acciones Preferidas usan sufijo "PREF" en su código/nombre
+  // (confirmado contra la hoja de propuesta: LAKI10PREFF, HMET0850PREFB) — no hay campo "tipo"
+  // explícito en el modelo de bonos, así que se infiere de la nomenclatura real de SweetWater.
+  function swlEsPreferida(b){
+    return /pref/i.test(b.codigo||"") || /pref/i.test(b.nombre||"");
+  }
+
   function renderSwLocal(){
     var todosBonos = backup.state.bonosLocales || [];
     var bonos = todosBonos.filter(function(b){ return !b.pagado; });
@@ -3257,9 +3269,19 @@
     var hist = backup.state.bonosLocalesHistorial || [];
     var periodosISO = swlMesesISO(meses);
     var totalValor = bonos.reduce(function(s,b){ return s+(b.valor||0); },0);
+    var rentaFijaValor = bonos.filter(function(b){ return !swlEsPreferida(b); }).reduce(function(s,b){ return s+(b.valor||0); },0);
+    var accPrefValor = bonos.filter(swlEsPreferida).reduce(function(s,b){ return s+(b.valor||0); },0);
+    var efectivo = backup.state.bonosLocalesEfectivo;
+    var totalGeneral = (efectivo ? efectivo.monto : 0) + totalValor;
+
     var cuponesPorMes = computeSwlCuponesPorMes(bonos, hist, periodosISO);
     var flujoAnual = cuponesPorMes.reduce(function(s,v){ return s+v; }, 0);
-    var rentAnual = totalValor ? (flujoAnual/totalValor*100) : 0;
+
+    // Rendimiento Corriente: cupón nominal puro (Valor × Tasa) de la cartera activa HOY, sin mezclar
+    // con historial de meses pasados (que reflejaban una cartera más chica) — coincide con el método
+    // de la hoja de propuesta ("Cupón Anual" / "Monto" = Dividend Yield).
+    var cuponNominalAnual = bonos.reduce(function(s,b){ var r = parseFloat(b.tasa) || 0; return s + (b.valor||0) * r/100; }, 0);
+    var rendCorriente = totalValor ? (cuponNominalAnual/totalValor*100) : 0;
 
     var tirResults = bonos.map(function(b){ return computeBondTir(b); }).filter(Boolean);
     var costoRealTotal = tirResults.reduce(function(s,r){ return s+r.costoReal; }, 0);
@@ -3267,17 +3289,20 @@
     var cargosPorTipo = computeSwlCargosPorTipo(hist, periodosISO);
     var totalAnualCargosReales = cargosPorTipo.reduce(function(s,fila){ return s + fila.reduce(function(a,v){return a+v;},0); }, 0);
     var flujoNetoAnual = flujoAnual - totalAnualCargosReales;
-    var efectivo = backup.state.bonosLocalesEfectivo;
+    // Rendimiento Anual Proyectado: el flujo real+proyectado (mezcla histórico/futuro) sobre capital —
+    // es el mismo cálculo que antes se llamaba "Rendimiento Corriente (Simple)", solo renombrado.
+    var rendAnualProyectado = totalValor ? (flujoAnual/totalValor*100) : 0;
+
+    els.swlKpisCapital.innerHTML =
+      '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">EFECTIVO</div><div class="value">' + (efectivo ? fmtMoney(efectivo.monto) : '—') + '</div><div class="foot">' + (efectivo ? 'Según estado de cuenta al ' + escapeHtml(efectivo.fecha) : 'Sin registrar') + '</div></div>' +
+      '<div class="summary-card" style="--accent:var(--blue)"><div class="label">RENTA FIJA</div><div class="value">' + fmtMoney(rentaFijaValor) + '</div><div class="foot">Bonos corporativos e hipotecarios</div></div>' +
+      '<div class="summary-card" style="--accent:var(--violet)"><div class="label">ACC. PREF.</div><div class="value">' + fmtMoney(accPrefValor) + '</div><div class="foot">Acciones preferidas</div></div>' +
+      '<div class="summary-card" style="--accent:var(--text)"><div class="label">TOTAL</div><div class="value">' + fmtMoney(totalGeneral) + '</div><div class="foot">' + bonos.length + ' instrumentos activos' + (bonosPagados.length ? " · " + bonosPagados.length + " pagados (ver Bonos)" : "") + '</div></div>';
 
     els.swlKpis.innerHTML =
-      (efectivo ? '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">EFECTIVO EN CUENTA</div><div class="value">' + fmtMoney(efectivo.monto) + '</div><div class="foot">Según estado de cuenta al ' + escapeHtml(efectivo.fecha) + '</div></div>' : '') +
-      '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">CAPITAL EN BONOS</div><div class="value">' + fmtMoney(totalValor) + '</div><div class="foot">' + bonos.length + ' instrumentos activos' + (bonosPagados.length ? " · " + bonosPagados.length + " pagados (ver Bonos)" : "") + '</div></div>' +
-      '<div class="summary-card" style="--accent:var(--blue)"><div class="label">FLUJO ANUAL PROYECTADO</div><div class="value">' + fmtMoney(flujoAnual) + '</div><div class="foot">Cupones, próximos 12 meses (excluye devolución de capital)</div></div>' +
-      '<div class="summary-card" style="--accent:var(--amber)"><div class="label">RENDIMIENTO CORRIENTE (SIMPLE)</div><div class="value">' + rentAnual.toFixed(1) + '%</div><div class="foot">Flujo anual / valor nominal — no ajustado por costos</div></div>' +
-      '<div class="summary-card" style="--accent:var(--violet)"><div class="label">TIR PONDERADA DE CARTERA</div><div class="value" style="color:' + (tirPonderada!=null?'var(--violet)':'var(--text-dim)') + '">' + (tirPonderada!=null ? tirPonderada.toFixed(2)+'%' : '—') + '</div><div class="foot">' + (tirPonderada!=null ? tirResults.length + ' de ' + bonos.length + ' bonos con costo real cargado' : 'Carga el costo real en la pestaña "Costo Real & TIR"') + '</div></div>' +
-      '<div class="summary-card" style="--accent:var(--blue)"><div class="label">BASE DE COSTO REAL</div><div class="value">' + (costoRealTotal ? fmtMoney(costoRealTotal) : '—') + '</div><div class="foot">Nominal + comisión + ITBMS + interés acumulado pagado</div></div>' +
-      '<div class="summary-card" style="--accent:var(--red)"><div class="label">FLUJO NETO ANUAL (después de fees)</div><div class="value" style="color:var(--emerald)">' + fmtMoney(flujoNetoAnual) + '</div><div class="foot">' + (totalAnualCargosReales>0 ? "− " + fmtMoney(totalAnualCargosReales) + "/año en cargos reales (ver desglose abajo)" : "Sin cargos reales detectados aún en el historial") + '</div></div>' +
-      '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">RENDIMIENTO NETO ANUAL</div><div class="value" style="color:var(--emerald)">' + (totalValor ? (flujoNetoAnual/totalValor*100).toFixed(2)+'%' : '—') + '</div><div class="foot">Flujo neto / capital en bonos — lo que realmente rinde después de todos los costos</div></div>';
+      '<div class="summary-card" style="--accent:var(--amber)"><div class="label">RENDIMIENTO CORRIENTE</div><div class="value">' + rendCorriente.toFixed(2) + '%</div><div class="foot">Cupón nominal (Valor×Tasa) / Capital — sin ajustar por costos</div></div>' +
+      '<div class="summary-card" style="--accent:var(--violet)"><div class="label">RENDIMIENTO ANUAL</div><div class="value" style="color:' + (tirPonderada!=null?'var(--violet)':'var(--text-dim)') + '">' + (tirPonderada!=null ? tirPonderada.toFixed(2)+'%' : '—') + '</div><div class="foot">' + (tirPonderada!=null ? 'TIR ponderada · ' + tirResults.length + ' de ' + bonos.length + ' bonos con costo real cargado' : 'Carga el costo real en la pestaña "Costo Real & TIR"') + '</div></div>' +
+      '<div class="summary-card" style="--accent:var(--blue)"><div class="label">RENDIMIENTO ANUAL PROYECTADO</div><div class="value">' + rendAnualProyectado.toFixed(2) + '%</div><div class="foot">Flujo real+proyectado próximos 12 meses (' + fmtMoney(flujoAnual) + ') / Capital</div></div>';
 
     buildSwlBonosTab(bonos, bonosPagados, totalValor);
     buildSwlFlujoTab(bonos, meses, hist, totalValor, periodosISO, cargosPorTipo, cuponesPorMes);
