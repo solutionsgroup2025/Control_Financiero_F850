@@ -3050,8 +3050,12 @@
       var mods = customModules();
       var existing = mods.find(function(m){ return m.id === spec.id; });
       if(!existing){
-        existing = { id: spec.id, label: spec.label, icon: spec.icon, cuentas: [] };
+        existing = { id: spec.id, label: spec.label, icon: spec.icon, tipo: spec.tipo, cuentas: [] };
         mods.push(existing);
+        didCreate = true;
+      } else if(existing.tipo !== spec.tipo){
+        // el módulo ya existía de un despliegue anterior a esta función — ponerlo al día sin tocar sus cuentas/historial
+        existing.tipo = spec.tipo;
         didCreate = true;
       }
       spec.cuentas.forEach(function(c){
@@ -3060,7 +3064,7 @@
           var inv = findInv(c.id);
           cuenta = { id: c.id, nombre: c.nombre, contrato: "", historial: [] };
           if(inv && inv.value != null){
-            cuenta.historial.push({ per: mesActual, total: inv.value, campos: { "Ingresos": 0, "Cargos": 0 } });
+            cuenta.historial.push({ per: mesActual, total: inv.value, campos: spec.tipo === "ahorro" ? { "Ingresos": 0, "Egresos": 0, "Cargos": 0, "Intereses": 0 } : { "Ingresos": 0, "Cargos": 0 } });
           }
           existing.cuentas.push(cuenta);
           didCreate = true;
@@ -6105,23 +6109,36 @@
     var sortedDesc = filtered.slice().sort(function(a,b){ return a.per<b.per?1:-1; });
 
     if(esAhorro){
-      els.customHistHead.innerHTML = "<th style='text-align:left'>Período</th><th>Saldo</th><th>Ingresos</th><th>Egresos</th>";
+      els.customHistHead.innerHTML = "<th style='text-align:left'>Período</th><th>Saldo Anterior</th><th>Ingresos</th><th>Egresos</th><th>Intereses</th><th>Cargos</th><th>Saldo Final</th>";
       var rowsA = sortedDesc.map(function(h){
+        var idxGlobal = hist.findIndex(function(x){ return x.per === h.per; });
+        var prevEntry = idxGlobal > 0 ? hist[idxGlobal-1] : null;
+        var saldoAnterior = prevEntry ? prevEntry.total : null;
         var ing = (h.campos && h.campos["Ingresos"]) || 0;
         var egr = (h.campos && h.campos["Egresos"]) || 0;
+        var interes = (h.campos && h.campos["Intereses"]) || 0;
+        var car = (h.campos && h.campos["Cargos"]) || 0;
         var isSelA = h.per === selectedPer;
         return "<tr data-per='" + h.per + "'" + (isSelA ? " style='background:" + hexToRgba("#3b82f6",0.14) + ";cursor:pointer;' class='row-selected'" : " style='cursor:pointer;'") + ">" +
           "<td style='text-align:left;font-weight:" + (isSelA?"800":"400") + "'>" + (isSelA?"▸ ":"") + escapeHtml(monthLabel(h.per)) + "</td>" +
-          "<td>" + fmtMoney(h.total) + "</td>" +
+          "<td style='color:var(--text-dim)'>" + (saldoAnterior!=null?fmtMoney(saldoAnterior):"—") + "</td>" +
           "<td style='color:var(--emerald)'>" + (ing>0?fmtMoney(ing):"—") + "</td>" +
-          "<td style='color:" + (egr>0?"var(--red)":"var(--text-dim)") + "'>" + (egr>0?fmtMoney(egr):"—") + "</td></tr>";
+          "<td style='color:" + (egr>0?"var(--red)":"var(--text-dim)") + "'>" + (egr>0?fmtMoney(egr):"—") + "</td>" +
+          "<td style='color:var(--blue)'>" + (interes>0?fmtMoney(interes):"—") + "</td>" +
+          "<td style='color:" + (car>0?"var(--red)":"var(--text-dim)") + "'>" + (car>0?fmtMoney(car):"—") + "</td>" +
+          "<td style='font-weight:700'>" + fmtMoney(h.total) + "</td></tr>";
       }).join("");
       var totIngA = filtered.reduce(function(s,h){ return s + ((h.campos && h.campos["Ingresos"]) || 0); }, 0);
       var totEgrA = filtered.reduce(function(s,h){ return s + ((h.campos && h.campos["Egresos"]) || 0); }, 0);
+      var totInteresA = filtered.reduce(function(s,h){ return s + ((h.campos && h.campos["Intereses"]) || 0); }, 0);
+      var totCarA = filtered.reduce(function(s,h){ return s + ((h.campos && h.campos["Cargos"]) || 0); }, 0);
       var totRowA = "<tr class='matrix-total'><td>TOTAL " + escapeHtml(customHistYear) + "</td><td></td>" +
         "<td style='color:var(--emerald)'>" + fmtMoney(totIngA) + "</td>" +
-        "<td style='color:var(--red)'>" + fmtMoney(totEgrA) + "</td></tr>";
-      els.customHistTableBody.innerHTML = (rowsA || "<tr><td colspan='4' style='text-align:center;color:var(--text-dim);padding:18px;'>Sin registros para " + escapeHtml(customHistYear) + ".</td></tr>") + totRowA;
+        "<td style='color:var(--red)'>" + fmtMoney(totEgrA) + "</td>" +
+        "<td style='color:var(--blue)'>" + fmtMoney(totInteresA) + "</td>" +
+        "<td style='color:var(--red)'>" + fmtMoney(totCarA) + "</td>" +
+        "<td style='font-weight:700'>" + (sortedDesc.length?fmtMoney(sortedDesc[0].total):"—") + "</td></tr>";
+      els.customHistTableBody.innerHTML = (rowsA || "<tr><td colspan='7' style='text-align:center;color:var(--text-dim);padding:18px;'>Sin registros para " + escapeHtml(customHistYear) + ".</td></tr>") + totRowA;
       els.customHistTableBody.querySelectorAll("tr[data-per]").forEach(function(tr){
         tr.addEventListener("click", function(){ customSelectedPer = tr.getAttribute("data-per"); renderCustomCuenta(); });
       });
