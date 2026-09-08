@@ -903,6 +903,14 @@
                 <label id="ivCargosLabel">Cargos / Comisiones</label>
                 <input type="number" step="0.01" id="ivCargos" placeholder="0.00">
               </div>
+              <div class="form-field" id="ivEgresosField" style="display:none;">
+                <label>Egresos (retiros)</label>
+                <input type="number" step="0.01" id="ivEgresos" placeholder="0.00">
+              </div>
+              <div class="form-field" id="ivInteresesField" style="display:none;">
+                <label>Intereses ganados</label>
+                <input type="number" step="0.01" id="ivIntereses" placeholder="0.00">
+              </div>
             </div>
             <div class="form-grid" id="ivPershingFields" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border-soft);">
               <div class="form-field full" style="margin-bottom:-4px;"><label style="color:var(--text-dim);">Composición por clase de activo (opcional — deja en blanco lo que no cambió)</label></div>
@@ -1533,6 +1541,10 @@
     importStatus: document.getElementById("importStatus"),
     importPreview: document.getElementById("importPreview"),
     importTarget: document.getElementById("importTarget"),
+    ivEgresosField: document.getElementById("ivEgresosField"),
+    ivEgresos: document.getElementById("ivEgresos"),
+    ivInteresesField: document.getElementById("ivInteresesField"),
+    ivIntereses: document.getElementById("ivIntereses"),
     ivCustomComposicionFields: document.getElementById("ivCustomComposicionFields"),
     ivCustomComposicionRows: document.getElementById("ivCustomComposicionRows"),
     btnAddComposicionRow: document.getElementById("btnAddComposicionRow"),
@@ -3022,14 +3034,14 @@
     var mesActual = new Date().toISOString().slice(0,7);
     var didCreate = false;
     var specs = [
-      { id:"liquidez", label:"Liquidez", icon:"💧", cuentas:[
+      { id:"liquidez", label:"Liquidez", icon:"💧", tipo:"ahorro", cuentas:[
         { id:"caja_fuerte", nombre:"Caja Fuerte" },
         { id:"it_consulting", nombre:"Cuenta Ahorro IT Consulting" },
         { id:"global_ahorro", nombre:"Global Bank Ahorra Más" },
         { id:"global_tap", nombre:"Global Bank Tap (Online)" },
         { id:"unfcu", nombre:"UNFCU — Ahorro USA" }
       ]},
-      { id:"cripto", label:"Cripto", icon:"🪙", cuentas:[
+      { id:"cripto", label:"Cripto", icon:"🪙", tipo:"ahorro", cuentas:[
         { id:"bit2me", nombre:"Bit2me" },
         { id:"blockfi", nombre:"Blockfi / PayPal" }
       ]}
@@ -4831,14 +4843,21 @@
     var val = els.importTarget.value;
     els.ivPershingFields.style.display = (val === "sw-pershing") ? "grid" : "none";
     if(val.indexOf("customcuenta:") === 0){
+      var parts = val.split(":");
+      var cmod = findCustomModule(parts[1]);
+      var esAhorro = cmod && cmod.tipo === "ahorro";
       els.ivValorTotalField.style.display = "";
       els.ivCargosField.style.display = "";
-      els.ivValorTotalLabel.textContent = "Total / Saldo del período";
+      els.ivValorTotalLabel.textContent = esAhorro ? "Saldo del período" : "Total / Saldo del período";
       els.ivIngresosLabel.textContent = "Ingresos";
-      els.ivCargosLabel.textContent = "Cargos";
-      els.ivCustomComposicionFields.style.display = "block";
+      els.ivCargosLabel.textContent = esAhorro ? "Cargos (fees)" : "Cargos";
+      els.ivEgresosField.style.display = esAhorro ? "" : "none";
+      els.ivInteresesField.style.display = esAhorro ? "" : "none";
+      els.ivCustomComposicionFields.style.display = esAhorro ? "none" : "block";
       return;
     }
+    els.ivEgresosField.style.display = "none";
+    els.ivInteresesField.style.display = "none";
     els.ivCustomComposicionFields.style.display = "none";
     var t = MODULE_TARGETS[val];
     if(!t) return;
@@ -5563,16 +5582,21 @@
       if(!ccuenta){ showToast("Cuenta no encontrada."); return; }
       var cper = els.ivPeriodo.value;
       if(!/^\d{4}-\d{2}$/.test(cper)){ showToast("Selecciona un período válido (mes/año)."); return; }
+      var cEsAhorro = cmod.tipo === "ahorro";
       var cValorTotal = els.ivValorTotal.value === "" ? null : parseFloat(els.ivValorTotal.value);
       var cIngresos = els.ivIngresos.value === "" ? 0 : parseFloat(els.ivIngresos.value) || 0;
       var cCargos = els.ivCargos.value === "" ? 0 : parseFloat(els.ivCargos.value) || 0;
+      var cEgresos = cEsAhorro ? (els.ivEgresos.value === "" ? 0 : parseFloat(els.ivEgresos.value) || 0) : 0;
+      var cIntereses = cEsAhorro ? (els.ivIntereses.value === "" ? 0 : parseFloat(els.ivIntereses.value) || 0) : 0;
       if(!Array.isArray(ccuenta.historial)) ccuenta.historial = [];
       var existingC = ccuenta.historial.find(function(h){ return h.per === cper; });
       var entryC = {
         per: cper,
         total: cValorTotal != null ? cValorTotal : (existingC ? existingC.total : 0),
-        campos: { "Ingresos": cIngresos, "Cargos": cCargos },
-        composicion: (function(){ var rows = collectComposicionRows(); return rows != null ? rows : (existingC ? existingC.composicion : undefined); })()
+        campos: cEsAhorro
+          ? { "Ingresos": cIngresos, "Egresos": cEgresos, "Cargos": cCargos, "Intereses": cIntereses }
+          : { "Ingresos": cIngresos, "Cargos": cCargos },
+        composicion: cEsAhorro ? undefined : (function(){ var rows = collectComposicionRows(); return rows != null ? rows : (existingC ? existingC.composicion : undefined); })()
       };
       if(existingC){ Object.assign(existingC, entryC); } else { ccuenta.historial.push(entryC); }
       var linkedInvId = CUSTOM_CUENTA_INVESTMENT_LINK[parts[1] + ":" + parts[2]];
@@ -5582,7 +5606,7 @@
       }
       setDirty(true);
       logIngest({ ts: new Date().toISOString(), modulo: cmod.label + " — " + ccuenta.nombre, periodo: cper, resumen: fmtMoney(entryC.total) + " total" });
-      els.ivPeriodo.value = ""; els.ivValorTotal.value = ""; els.ivIngresos.value = ""; els.ivCargos.value = ""; els.ivNotas.value = "";
+      els.ivPeriodo.value = ""; els.ivValorTotal.value = ""; els.ivIngresos.value = ""; els.ivCargos.value = ""; els.ivEgresos.value = ""; els.ivIntereses.value = ""; els.ivNotas.value = "";
       renderComposicionRows(null);
       els.importPreview.style.display = "none"; els.importStatus.style.display = "none"; els.importFile.value = "";
       showToast("Aplicado a " + cmod.label + " — " + ccuenta.nombre + " (" + monthLabel(cper) + ").");
@@ -6002,21 +6026,50 @@
 
     var latest = visibleHist[visibleHist.length-1], prev = visibleHist[visibleHist.length-2];
     var cambio = (latest && prev) ? (latest.total - prev.total) : 0;
+    var esAhorro = mod.tipo === "ahorro";
     var camposKeys = latest ? Object.keys(latest.campos||{}) : [];
-    var primaryField = camposKeys[0];
-    var totalPrimary = visibleHist.reduce(function(s,h){ return s + ((h.campos && primaryField) ? (h.campos[primaryField]||0) : 0); }, 0);
 
-    els.customKpis.innerHTML =
-      '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">SALDO ACTUAL</div><div class="value">' + fmtMoney(latest?latest.total:0) + '</div><div class="foot">' + (latest?monthLabel(latest.per):"—") + (selectedPer !== (hist.length?hist[hist.length-1].per:null) ? ' <span style="color:var(--amber)">· viendo mes pasado</span>' : '') + '</div></div>' +
-      '<div class="summary-card" style="--accent:' + (cambio>=0?'var(--emerald)':'var(--red)') + '"><div class="label">CAMBIO VS PERÍODO ANTERIOR</div><div class="value" style="color:' + (cambio>=0?'var(--emerald)':'var(--red)') + '">' + (cambio>=0?'+':'') + fmtMoney(cambio) + '</div><div class="foot">' + (prev?('vs '+monthLabel(prev.per)):'Sin periodo anterior') + '</div></div>' +
-      '<div class="summary-card" style="--accent:var(--blue)"><div class="label">' + escapeHtml((primaryField||"TOTAL").toUpperCase()) + ' ACUMULADO</div><div class="value">' + fmtMoney(totalPrimary) + '</div><div class="foot">Suma de ' + visibleHist.length + ' período(s)</div></div>';
+    if(esAhorro){
+      var ing = (latest && latest.campos && latest.campos["Ingresos"]) || 0;
+      var egr = (latest && latest.campos && latest.campos["Egresos"]) || 0;
+      els.customKpis.innerHTML =
+        '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">SALDO ACTUAL</div><div class="value">' + fmtMoney(latest?latest.total:0) + '</div><div class="foot">' + (latest?monthLabel(latest.per):"—") + (selectedPer !== (hist.length?hist[hist.length-1].per:null) ? ' <span style="color:var(--amber)">· viendo mes pasado</span>' : '') + '</div></div>' +
+        '<div class="summary-card" style="--accent:var(--blue)"><div class="label">INGRESOS DEL PERÍODO</div><div class="value" style="color:var(--emerald)">' + fmtMoney(ing) + '</div><div class="foot">' + (latest?monthLabel(latest.per):"—") + '</div></div>' +
+        '<div class="summary-card" style="--accent:var(--red)"><div class="label">EGRESOS DEL PERÍODO</div><div class="value" style="color:' + (egr>0?'var(--red)':'inherit') + '">' + fmtMoney(egr) + '</div><div class="foot">' + (latest?monthLabel(latest.per):"—") + '</div></div>';
+    } else {
+      var primaryField = camposKeys[0];
+      var totalPrimary = visibleHist.reduce(function(s,h){ return s + ((h.campos && primaryField) ? (h.campos[primaryField]||0) : 0); }, 0);
+      els.customKpis.innerHTML =
+        '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">SALDO ACTUAL</div><div class="value">' + fmtMoney(latest?latest.total:0) + '</div><div class="foot">' + (latest?monthLabel(latest.per):"—") + (selectedPer !== (hist.length?hist[hist.length-1].per:null) ? ' <span style="color:var(--amber)">· viendo mes pasado</span>' : '') + '</div></div>' +
+        '<div class="summary-card" style="--accent:' + (cambio>=0?'var(--emerald)':'var(--red)') + '"><div class="label">CAMBIO VS PERÍODO ANTERIOR</div><div class="value" style="color:' + (cambio>=0?'var(--emerald)':'var(--red)') + '">' + (cambio>=0?'+':'') + fmtMoney(cambio) + '</div><div class="foot">' + (prev?('vs '+monthLabel(prev.per)):'Sin periodo anterior') + '</div></div>' +
+        '<div class="summary-card" style="--accent:var(--blue)"><div class="label">' + escapeHtml((primaryField||"TOTAL").toUpperCase()) + ' ACUMULADO</div><div class="value">' + fmtMoney(totalPrimary) + '</div><div class="foot">Suma de ' + visibleHist.length + ' período(s)</div></div>';
+    }
 
     var chartData = visibleHist.map(function(h){ return { label: monthLabel(h.per), value: h.total }; });
     var builtCustom = buildLineChartSvg(chartData, "#3b82f6");
     els.customLineChartWrap.innerHTML = builtCustom.svg;
     if(builtCustom.meta) attachChartTooltip(els.customLineChartWrap, builtCustom.meta, "#3b82f6");
 
-    if(latest && latest.composicion && Object.keys(latest.composicion).length){
+    if(esAhorro){
+      // para cuentas de ahorro, "Composición" muestra el detalle del movimiento del período
+      // (Ingresos/Egresos/Cargos/Intereses) y el saldo resultante — no un desglose de fondos.
+      if(latest){
+        var c = latest.campos || {};
+        var movLabels = [
+          { k:"Ingresos", color:"var(--emerald)" },
+          { k:"Egresos", color:"var(--red)" },
+          { k:"Cargos", color:"var(--red)" },
+          { k:"Intereses", color:"var(--blue)" }
+        ];
+        els.customComposicion.innerHTML = movLabels.map(function(m){
+          var v = c[m.k] || 0;
+          return '<div class="sr"><span class="lbl">' + m.k + '</span><span class="val" style="color:' + m.color + ';font-weight:700;">' + (m.k==="Egresos"||m.k==="Cargos" ? (v>0?"−":"") : (v>0?"+":"")) + fmtMoney(Math.abs(v)) + '</span></div>';
+        }).join("") +
+        '<div class="sr" style="border-top:1px solid var(--border);margin-top:8px;padding-top:10px;font-weight:800;"><span class="lbl">Saldo de la cuenta</span><span class="val" style="color:var(--emerald);">' + fmtMoney(latest.total) + '</span></div>';
+      } else {
+        els.customComposicion.innerHTML = '<div class="mv-empty">Sin datos todavía.</div>';
+      }
+    } else if(latest && latest.composicion && Object.keys(latest.composicion).length){
       var compKeys = Object.keys(latest.composicion);
       var compTotal = compKeys.reduce(function(s,k){ return s + latest.composicion[k]; }, 0);
       els.customComposicion.innerHTML = compKeys.map(function(k, i){
@@ -6047,10 +6100,36 @@
       btn.addEventListener("click", function(){ customHistYear = btn.getAttribute("data-year"); buildCustomHistorialTab(mod, cuenta, hist, selectedPer); });
     });
 
-    els.customHistHead.innerHTML = "<th style='text-align:left'>Período</th><th>Total</th><th>Ingresos</th><th>Cargos</th><th>Total Neto</th><th>% Rendimiento</th>";
-
+    var esAhorro = mod.tipo === "ahorro";
     var filtered = hist.filter(function(h){ return h.per.slice(0,4) === customHistYear; });
     var sortedDesc = filtered.slice().sort(function(a,b){ return a.per<b.per?1:-1; });
+
+    if(esAhorro){
+      els.customHistHead.innerHTML = "<th style='text-align:left'>Período</th><th>Saldo</th><th>Ingresos</th><th>Egresos</th>";
+      var rowsA = sortedDesc.map(function(h){
+        var ing = (h.campos && h.campos["Ingresos"]) || 0;
+        var egr = (h.campos && h.campos["Egresos"]) || 0;
+        var isSelA = h.per === selectedPer;
+        return "<tr data-per='" + h.per + "'" + (isSelA ? " style='background:" + hexToRgba("#3b82f6",0.14) + ";cursor:pointer;' class='row-selected'" : " style='cursor:pointer;'") + ">" +
+          "<td style='text-align:left;font-weight:" + (isSelA?"800":"400") + "'>" + (isSelA?"▸ ":"") + escapeHtml(monthLabel(h.per)) + "</td>" +
+          "<td>" + fmtMoney(h.total) + "</td>" +
+          "<td style='color:var(--emerald)'>" + (ing>0?fmtMoney(ing):"—") + "</td>" +
+          "<td style='color:" + (egr>0?"var(--red)":"var(--text-dim)") + "'>" + (egr>0?fmtMoney(egr):"—") + "</td></tr>";
+      }).join("");
+      var totIngA = filtered.reduce(function(s,h){ return s + ((h.campos && h.campos["Ingresos"]) || 0); }, 0);
+      var totEgrA = filtered.reduce(function(s,h){ return s + ((h.campos && h.campos["Egresos"]) || 0); }, 0);
+      var totRowA = "<tr class='matrix-total'><td>TOTAL " + escapeHtml(customHistYear) + "</td><td></td>" +
+        "<td style='color:var(--emerald)'>" + fmtMoney(totIngA) + "</td>" +
+        "<td style='color:var(--red)'>" + fmtMoney(totEgrA) + "</td></tr>";
+      els.customHistTableBody.innerHTML = (rowsA || "<tr><td colspan='4' style='text-align:center;color:var(--text-dim);padding:18px;'>Sin registros para " + escapeHtml(customHistYear) + ".</td></tr>") + totRowA;
+      els.customHistTableBody.querySelectorAll("tr[data-per]").forEach(function(tr){
+        tr.addEventListener("click", function(){ customSelectedPer = tr.getAttribute("data-per"); renderCustomCuenta(); });
+      });
+      return;
+    }
+
+    els.customHistHead.innerHTML = "<th style='text-align:left'>Período</th><th>Total</th><th>Ingresos</th><th>Cargos</th><th>Total Neto</th><th>% Rendimiento</th>";
+
     var rows = sortedDesc.map(function(h){
       var ing = (h.campos && h.campos["Ingresos"]) || 0;
       var car = (h.campos && h.campos["Cargos"]) || 0;
