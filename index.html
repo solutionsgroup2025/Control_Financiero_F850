@@ -872,6 +872,11 @@
             </div>
             <div id="ivPershingPosSummary" style="color:var(--text-muted);font-size:12.5px;margin-top:10px;"></div>
             <div id="ivPershingCashDetail"></div>
+            <div id="ivCustomComposicionFields" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border-soft);">
+              <label style="color:var(--text-dim);display:block;margin-bottom:8px;">Composición por fondo / categoría (opcional)</label>
+              <div id="ivCustomComposicionRows"></div>
+              <button type="button" class="btn btn-secondary" id="btnAddComposicionRow" style="margin-top:6px;padding:4px 10px;font-size:12px;">+ Agregar fondo</button>
+            </div>
             <div class="form-grid" style="margin-top:12px;">
               <div class="form-field full">
                 <label>Notas</label>
@@ -1483,6 +1488,9 @@
     importStatus: document.getElementById("importStatus"),
     importPreview: document.getElementById("importPreview"),
     importTarget: document.getElementById("importTarget"),
+    ivCustomComposicionFields: document.getElementById("ivCustomComposicionFields"),
+    ivCustomComposicionRows: document.getElementById("ivCustomComposicionRows"),
+    btnAddComposicionRow: document.getElementById("btnAddComposicionRow"),
     ivPeriodo: document.getElementById("ivPeriodo"),
     ivValorTotalField: document.getElementById("ivValorTotalField"),
     ivValorTotalLabel: document.getElementById("ivValorTotalLabel"),
@@ -4721,8 +4729,10 @@
       els.ivValorTotalLabel.textContent = "Total / Saldo del período";
       els.ivIngresosLabel.textContent = "Ingresos";
       els.ivCargosLabel.textContent = "Cargos";
+      els.ivCustomComposicionFields.style.display = "block";
       return;
     }
+    els.ivCustomComposicionFields.style.display = "none";
     var t = MODULE_TARGETS[val];
     if(!t) return;
     els.ivValorTotalField.style.display = t.valorLabel ? "" : "none";
@@ -4732,6 +4742,37 @@
     els.ivCargosLabel.textContent = t.carLabel || "";
   }
   els.importTarget.addEventListener("change", applyTargetFieldVisibility);
+
+  /* ---------- Composición dinámica para cuentas personalizadas (Profuturo, etc.) ---------- */
+  function addComposicionRow(label, monto){
+    var row = document.createElement("div");
+    row.className = "form-grid";
+    row.style.cssText = "grid-template-columns:1fr 140px 30px;gap:8px;margin-bottom:6px;align-items:center;";
+    row.innerHTML =
+      "<input type='text' class='cc-label' placeholder='Ej: ProVisión' value=\"" + escapeHtml(label||"") + "\">" +
+      "<input type='number' step='0.01' class='cc-monto' placeholder='0.00' value=\"" + (monto!=null?monto:"") + "\">" +
+      "<button type='button' class='btn btn-secondary cc-remove' style='padding:4px 8px;'>✕</button>";
+    row.querySelector(".cc-remove").addEventListener("click", function(){ row.remove(); });
+    els.ivCustomComposicionRows.appendChild(row);
+  }
+  function renderComposicionRows(compObj){
+    els.ivCustomComposicionRows.innerHTML = "";
+    var keys = compObj ? Object.keys(compObj) : [];
+    if(!keys.length){ addComposicionRow("", null); return; }
+    keys.forEach(function(k){ addComposicionRow(k, compObj[k]); });
+  }
+  function collectComposicionRows(){
+    var result = {};
+    var any = false;
+    els.ivCustomComposicionRows.querySelectorAll(".form-grid").forEach(function(row){
+      var label = row.querySelector(".cc-label").value.trim();
+      var montoStr = row.querySelector(".cc-monto").value;
+      if(label && montoStr !== ""){ result[label] = parseFloat(montoStr) || 0; any = true; }
+    });
+    return any ? result : null;
+  }
+  els.btnAddComposicionRow.addEventListener("click", function(){ addComposicionRow("", null); });
+  renderComposicionRows(null);
 
   function monthLabel(per){
     var mn=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
@@ -5125,6 +5166,9 @@
     // El Saldo de Cierre del Fondo Money Market (Detalles del Fondo Money Market, Pág.10) es más confiable
     // que el "efectivo" del resumen general — todos los dividendos entran primero a este fondo.
     if(obj.efectivoCierreMes != null) els.ivEfectivo.value = obj.efectivoCierreMes;
+    if(els.importTarget.value.indexOf("customcuenta:") === 0){
+      renderComposicionRows(obj.composicion || null);
+    }
     pendingPershingPositions = obj.posiciones || null;
     if(els.ivPershingPosSummary){
       if(pendingPershingPositions){
@@ -5369,7 +5413,8 @@
           + "\n\nEjemplo de formato esperado:\n{\"periodo\":\"2026-08\",\"numeroPoliza\":\"RS02017296\",\"total\":34514.52,\"premiosInvertidos\":25200,\"composicion\":{\"Guinness Global Innovators C Acc USD\":10117.80,\"BGF World Technology A2 Acc USD\":8393.60,\"Janus Henderson US Forty A Acc USD\":8356.77,\"Janus Henderson Global Life Sciences\":7646.35},\"cargosLineas\":[{\"descripcion\":\"Administration Charge\",\"monto\":45.20},{\"descripcion\":\"Establishment Charge\",\"monto\":38.50},{\"descripcion\":\"Servicing Charge\",\"monto\":5.00},{\"descripcion\":\"Financial Adviser Fee\",\"monto\":12.60}]}"
           : "Este es el texto extraído de un estado de cuenta financiero:\n\n" + pdfPreviewText + "\n\nExtrae: periodo (formato YYYY-MM), saldo/valor total del periodo, ingresos/cupones/réditos/canon del periodo, y cargos/comisiones del periodo. " +
             "Además, si el documento trae detalle línea por línea de transacciones (ej. \"Cupón X\", \"COMISION\", \"ITBMS\", \"INTERES ACUMULADO\", cargos de custodia/manejo, etc.), inclúyelo en ingresosLineas y cargosLineas como arreglos de {\"descripcion\":\"...\",\"monto\":0} — una línea por cada transacción individual del período, con su descripción literal (ej. \"Cupón ALUT0875000527W\", \"Comisión compra\", \"ITBMS 7%\"). Si no hay detalle línea por línea disponible, omite estos dos campos. " +
-            "Responde SOLO con JSON: {\"periodo\":\"YYYY-MM\",\"total\":0,\"ingresos\":0,\"cargos\":0,\"ingresosLineas\":[{\"descripcion\":\"...\",\"monto\":0}],\"cargosLineas\":[{\"descripcion\":\"...\",\"monto\":0}]}";
+            "Además, si el documento trae una tabla de composición/desglose por fondo, tipo de inversión, o tipo de saldo (ej. fondos de pensión con varias sub-cuentas como \"ProAhorro\", \"ProVisión\", \"ProCapital\", \"ProInversión\", o categorías tipo \"Patronal\"/\"Personal\"), inclúyelo en \"composicion\" como un objeto {\"nombre exacto de la categoría\":monto}, usando el nombre EXACTO tal como aparece en el documento (debe coincidir mes a mes para poder comparar). Si el documento trae MÁS DE UNA tabla de desglose (ej. por tipo de saldo Y por tipo de inversión), usa la de \"tipo de inversión\" o \"tipo de fondo\" (la que desglosa por fondo/instrumento, no por origen del aporte). Si no hay ninguna tabla de este tipo, omite el campo \"composicion\" — NO inventes categorías ni cifras. " +
+            "Responde SOLO con JSON: {\"periodo\":\"YYYY-MM\",\"total\":0,\"ingresos\":0,\"cargos\":0,\"ingresosLineas\":[{\"descripcion\":\"...\",\"monto\":0}],\"cargosLineas\":[{\"descripcion\":\"...\",\"monto\":0}],\"composicion\":{\"...\":0}}";
         return fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
           headers: {
@@ -5420,12 +5465,13 @@
         per: cper,
         total: cValorTotal != null ? cValorTotal : (existingC ? existingC.total : 0),
         campos: { "Ingresos": cIngresos, "Cargos": cCargos },
-        composicion: existingC ? existingC.composicion : undefined
+        composicion: (function(){ var rows = collectComposicionRows(); return rows != null ? rows : (existingC ? existingC.composicion : undefined); })()
       };
       if(existingC){ Object.assign(existingC, entryC); } else { ccuenta.historial.push(entryC); }
       setDirty(true);
       logIngest({ ts: new Date().toISOString(), modulo: cmod.label + " — " + ccuenta.nombre, periodo: cper, resumen: fmtMoney(entryC.total) + " total" });
       els.ivPeriodo.value = ""; els.ivValorTotal.value = ""; els.ivIngresos.value = ""; els.ivCargos.value = ""; els.ivNotas.value = "";
+      renderComposicionRows(null);
       els.importPreview.style.display = "none"; els.importStatus.style.display = "none"; els.importFile.value = "";
       showToast("Aplicado a " + cmod.label + " — " + ccuenta.nombre + " (" + monthLabel(cper) + ").");
       return;
