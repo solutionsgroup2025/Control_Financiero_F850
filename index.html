@@ -5832,6 +5832,7 @@
   /* ---------- Módulos personalizados (constructor genérico) ---------- */
   var currentCustomModuleId = null;
   var currentCustomCuentaId = null;
+  var customSelectedPer = null; // null = último período (comportamiento por defecto); si se elige una fila del historial, "viaja en el tiempo" hasta ese mes
 
   function customModules(){ return backup.state.customModules || (backup.state.customModules = []); }
   function findCustomModule(id){ return customModules().find(function(m){ return m.id === id; }); }
@@ -5878,6 +5879,7 @@
     els.customCuentaSelector.querySelectorAll(".month-btn").forEach(function(btn){
       btn.addEventListener("click", function(){
         currentCustomCuentaId = btn.getAttribute("data-cuenta");
+        customSelectedPer = null; // al cambiar de cuenta, vuelve a mostrar el último período por defecto
         renderCustomCuenta();
       });
     });
@@ -5892,21 +5894,28 @@
     if(!cuenta) return;
     var hist = (cuenta.historial||[]).slice().sort(function(a,b){ return a.per<b.per?-1:1; });
 
-    els.customChartTitle.textContent = "Evolución — " + cuenta.nombre;
-    els.customChartSub.textContent = hist.length ? ("Desde " + monthLabel(hist[0].per) + " hasta " + monthLabel(hist[hist.length-1].per)) : "Sin datos todavía";
+    // "viaje en el tiempo": si hay un período seleccionado del historial, la vista completa (KPIs,
+    // gráfico, composición) se recalcula como si ese mes fuera el más reciente — no un popup aparte.
+    var selectedPer = (customSelectedPer && hist.some(function(h){ return h.per === customSelectedPer; }))
+      ? customSelectedPer
+      : (hist.length ? hist[hist.length-1].per : null);
+    var visibleHist = selectedPer ? hist.filter(function(h){ return h.per <= selectedPer; }) : [];
 
-    var latest = hist[hist.length-1], prev = hist[hist.length-2];
+    els.customChartTitle.textContent = "Evolución — " + cuenta.nombre;
+    els.customChartSub.textContent = visibleHist.length ? ("Desde " + monthLabel(visibleHist[0].per) + " hasta " + monthLabel(visibleHist[visibleHist.length-1].per)) : "Sin datos todavía";
+
+    var latest = visibleHist[visibleHist.length-1], prev = visibleHist[visibleHist.length-2];
     var cambio = (latest && prev) ? (latest.total - prev.total) : 0;
     var camposKeys = latest ? Object.keys(latest.campos||{}) : [];
     var primaryField = camposKeys[0];
-    var totalPrimary = hist.reduce(function(s,h){ return s + ((h.campos && primaryField) ? (h.campos[primaryField]||0) : 0); }, 0);
+    var totalPrimary = visibleHist.reduce(function(s,h){ return s + ((h.campos && primaryField) ? (h.campos[primaryField]||0) : 0); }, 0);
 
     els.customKpis.innerHTML =
-      '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">SALDO ACTUAL</div><div class="value">' + fmtMoney(latest?latest.total:0) + '</div><div class="foot">' + (latest?monthLabel(latest.per):"—") + '</div></div>' +
+      '<div class="summary-card" style="--accent:var(--emerald)"><div class="label">SALDO ACTUAL</div><div class="value">' + fmtMoney(latest?latest.total:0) + '</div><div class="foot">' + (latest?monthLabel(latest.per):"—") + (selectedPer !== (hist.length?hist[hist.length-1].per:null) ? ' <span style="color:var(--amber)">· viendo mes pasado</span>' : '') + '</div></div>' +
       '<div class="summary-card" style="--accent:' + (cambio>=0?'var(--emerald)':'var(--red)') + '"><div class="label">CAMBIO VS PERÍODO ANTERIOR</div><div class="value" style="color:' + (cambio>=0?'var(--emerald)':'var(--red)') + '">' + (cambio>=0?'+':'') + fmtMoney(cambio) + '</div><div class="foot">' + (prev?('vs '+monthLabel(prev.per)):'Sin periodo anterior') + '</div></div>' +
-      '<div class="summary-card" style="--accent:var(--blue)"><div class="label">' + escapeHtml((primaryField||"TOTAL").toUpperCase()) + ' ACUMULADO</div><div class="value">' + fmtMoney(totalPrimary) + '</div><div class="foot">Suma de ' + hist.length + ' período(s)</div></div>';
+      '<div class="summary-card" style="--accent:var(--blue)"><div class="label">' + escapeHtml((primaryField||"TOTAL").toUpperCase()) + ' ACUMULADO</div><div class="value">' + fmtMoney(totalPrimary) + '</div><div class="foot">Suma de ' + visibleHist.length + ' período(s)</div></div>';
 
-    var chartData = hist.map(function(h){ return { label: monthLabel(h.per), value: h.total }; });
+    var chartData = visibleHist.map(function(h){ return { label: monthLabel(h.per), value: h.total }; });
     var builtCustom = buildLineChartSvg(chartData, "#3b82f6");
     els.customLineChartWrap.innerHTML = builtCustom.svg;
     if(builtCustom.meta) attachChartTooltip(els.customLineChartWrap, builtCustom.meta, "#3b82f6");
@@ -5925,12 +5934,12 @@
       els.customComposicion.innerHTML = '<div class="mv-empty">Sin desglose para este período.</div>';
     }
 
-    buildCustomHistorialTab(mod, cuenta, hist);
+    buildCustomHistorialTab(mod, cuenta, hist, selectedPer);
   }
 
   var customHistYear = null;
 
-  function buildCustomHistorialTab(mod, cuenta, hist){
+  function buildCustomHistorialTab(mod, cuenta, hist, selectedPer){
     var years = Array.from(new Set(hist.map(function(h){ return h.per.slice(0,4); }))).sort(function(a,b){ return b.localeCompare(a); });
     if(!years.length) years = [String(new Date().getFullYear())];
     if(!customHistYear || years.indexOf(customHistYear) === -1) customHistYear = years[0];
@@ -5939,7 +5948,7 @@
       return '<button class="month-btn' + (y===customHistYear?' on':'') + '" data-year="' + y + '">' + y + '</button>';
     }).join("");
     els.customHistYearSelector.querySelectorAll(".month-btn").forEach(function(btn){
-      btn.addEventListener("click", function(){ customHistYear = btn.getAttribute("data-year"); buildCustomHistorialTab(mod, cuenta, hist); });
+      btn.addEventListener("click", function(){ customHistYear = btn.getAttribute("data-year"); buildCustomHistorialTab(mod, cuenta, hist, selectedPer); });
     });
 
     els.customHistHead.innerHTML = "<th style='text-align:left'>Período</th><th>Total</th><th>Ingresos</th><th>Cargos</th><th>Total Neto</th><th>% Rendimiento</th>";
@@ -5951,7 +5960,9 @@
       var car = (h.campos && h.campos["Cargos"]) || 0;
       var neto = ing - car;
       var rendPct = h.total ? (neto/h.total*100) : 0;
-      return "<tr data-per='" + h.per + "'><td style='text-align:left'>" + escapeHtml(monthLabel(h.per)) + "</td>" +
+      var isSel = h.per === selectedPer;
+      return "<tr data-per='" + h.per + "'" + (isSel ? " style='background:" + hexToRgba("#3b82f6",0.14) + ";cursor:pointer;' class='row-selected'" : " style='cursor:pointer;'") + ">" +
+        "<td style='text-align:left;font-weight:" + (isSel?"800":"400") + "'>" + (isSel?"▸ ":"") + escapeHtml(monthLabel(h.per)) + "</td>" +
         "<td>" + fmtMoney(h.total) + "</td>" +
         "<td style='color:var(--emerald)'>" + (ing>0?fmtMoney(ing):"—") + "</td>" +
         "<td style='color:" + (car>0?"var(--red)":"var(--text-dim)") + "'>" + (car>0?fmtMoney(car):"—") + "</td>" +
@@ -5972,7 +5983,10 @@
 
     els.customHistTableBody.innerHTML = (rows || "<tr><td colspan='6' style='text-align:center;color:var(--text-dim);padding:18px;'>Sin registros para " + escapeHtml(customHistYear) + ".</td></tr>") + totRow;
     els.customHistTableBody.querySelectorAll("tr[data-per]").forEach(function(tr){
-      tr.addEventListener("click", function(){ openCustomDetail(mod, cuenta, tr.getAttribute("data-per")); });
+      tr.addEventListener("click", function(){
+        customSelectedPer = tr.getAttribute("data-per");
+        renderCustomCuenta();
+      });
     });
   }
 
